@@ -46,6 +46,7 @@
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
+#include "app_timer.h"
 
 #define SPI_INSTANCE  0 /**< SPI instance index. */
 static const nrf_drv_spi_t spi = NRF_DRV_SPI_INSTANCE(SPI_INSTANCE); /**< SPI instance. */
@@ -74,13 +75,17 @@ void spi_event_handler(const nrf_drv_spi_evt_t * p_event,
 
 int main(void)
 {
+    ret_code_t ret_val = 0;
     bsp_board_init(BSP_INIT_LEDS);
+
+    ret_val = app_timer_init();
+    APP_ERROR_CHECK(ret_val);
 
     APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
     NRF_LOG_DEFAULT_BACKENDS_INIT();
 
     nrf_drv_spi_config_t spi_config = NRF_DRV_SPI_DEFAULT_CONFIG;
-    spi_config.ss_pin   = SPI_SS_PIN;
+    spi_config.ss_pin   = SPI_nCS_PIN;
     spi_config.miso_pin = SPI_MISO_PIN;
     spi_config.mosi_pin = SPI_MOSI_PIN;
     spi_config.sck_pin  = SPI_SCK_PIN;

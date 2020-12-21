@@ -1,5 +1,8 @@
 # Application Source Files
-C_SRC := $(APP_DIR)/src/main.c
+C_SRC := \
+    $(APP_DIR)/src/main.c \
+    $(APP_DIR)/src/spi.c \
+    $(APP_DIR)/src/ext_mem_driver.c \
 
 VPATH := $(APP_DIR)/src/
 
@@ -83,6 +86,7 @@ INC := \
     $(SDK_DIR)/util \
     $(APP_DIR) \
     $(APP_DIR)/src \
+    $(APP_DIR)/inc \
     $(SDK_DIR)/balloc \
     $(SDK_DIR)/ringbuf \
     $(SDK_DIR)/modules/nrfx/hal \
