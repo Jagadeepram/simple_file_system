@@ -15,6 +15,10 @@ extern "C" {
 #include "boards.h"
 #include "sdk_config.h"
 
+
+/**@brief Initialize External Memory
+ *
+ */
 void ext_mem_init(void);
 
 /**@brief Erase page

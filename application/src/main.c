@@ -69,6 +69,6 @@ int main(void)
     while (1)
     {
         bsp_board_led_invert(BSP_BOARD_LED_0);
-        nrf_delay_ms(100);
+        nrf_delay_ms(1000);
     }
 }

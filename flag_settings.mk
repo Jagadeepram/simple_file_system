@@ -12,8 +12,6 @@ CFLAGS += -DBOARD_PCA10056
 CFLAGS += -DCONFIG_GPIO_AS_PINRESET
 CFLAGS += -DFLOAT_ABI_HARD
 CFLAGS += -DNRF52840_XXAA
-CFLAGS += -D__HEAP_SIZE=8192
-CFLAGS += -D__STACK_SIZE=8192
 CFLAGS += -mcpu=cortex-m4
 CFLAGS += -mthumb -mabi=aapcs
 CFLAGS += -Wall -Werror
@@ -21,6 +19,7 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 # keep every function in a separate section, this allows linker to discard unused ones
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
+CFLAGS += -MD
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
@@ -35,8 +34,6 @@ SFLAGS += -DBOARD_PCA10056
 SFLAGS += -DCONFIG_GPIO_AS_PINRESET
 SFLAGS += -DFLOAT_ABI_HARD
 SFLAGS += -DNRF52840_XXAA
-SFLAGS += -D__HEAP_SIZE=8192
-SFLAGS += -D__STACK_SIZE=8192
 
 
 LINKER_SCRIPT  := $(SDK_DIR)/spi_gcc_nrf52.ld
