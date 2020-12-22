@@ -21,14 +21,14 @@ ret_code_t spi_txrx(const uint8_t *tx_buff, size_t tx_len, uint8_t *rx_buff, siz
 /**
  * @brief Initialize SPI driver.
  *
- * @return
+ * @return ret_code_t
  */
 void spi_init(void);
 
 /**
  * @brief Un-Initialize SPI driver
  *
- * @return
+ * @return None
  */
 void spi_uninit(void);
 

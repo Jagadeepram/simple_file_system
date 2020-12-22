@@ -115,23 +115,23 @@ static ret_code_t write_enable(void)
     return err_code;
 }
 
-//static ret_code_t ext_mem_soft_reset(void)
-//{
-//    ret_code_t err_code;
-//    uint8_t cmd = REST_ENABLE_CMD;
-//    uint8_t temp;
-//
-//    err_code = spi_transfer(&cmd, 1, &temp, 1);
-//    nrf_delay_ms(10);
-//    if (err_code == NRF_SUCCESS)
-//    {
-//        cmd = REST_CMD;
-//        err_code = spi_transfer(&cmd, 1, &temp, 1);
-//        nrf_delay_ms(10);
-//    }
-//
-//    return err_code;
-//}
+static ret_code_t ext_mem_soft_reset(void)
+{
+    ret_code_t err_code;
+    uint8_t cmd = REST_ENABLE_CMD;
+    uint8_t temp;
+
+    err_code = spi_transfer(&cmd, 1, &temp, 1);
+    nrf_delay_ms(10);
+    if (err_code == NRF_SUCCESS)
+    {
+        cmd = REST_CMD;
+        err_code = spi_transfer(&cmd, 1, &temp, 1);
+        nrf_delay_ms(10);
+    }
+
+    return err_code;
+}
 
 ret_code_t enable_ext_mem_deep_power_down(void)
 {
@@ -398,6 +398,43 @@ void ext_mem_erase_sector(uint32_t start_address)
     ext_mem_erase(start_address, ERASE_SIZE_64K);
 }
 
+void ext_mem_init(void)
+{
+    uint64_t mem_key;
+
+    spi_init();
+    nrf_gpio_cfg_output(SPI_nCS_PIN);
+    nrf_gpio_cfg_output(SPI_nWP_PIN);
+    nrf_gpio_cfg_output(SPI_nHOLD_PIN);
+
+    nrf_gpio_pin_set(SPI_nCS_PIN);
+    nrf_gpio_pin_set(SPI_nWP_PIN);
+    nrf_gpio_pin_set(SPI_nHOLD_PIN);
+
+    /* Release from deep power down mode */
+    release_ext_mem_deep_power_down();
+    /* Perform software reset */
+    ext_mem_soft_reset();
+
+    /* Read first 8 bytes of memory */
+    ext_mem_read_data((uint8_t *)&mem_key, sizeof(mem_key), 0x0);
+    if (mem_key == 0xFFFFFFFFFFFFFFFF)
+    {
+        /* Chip is formatted, update memory init key */
+        mem_key = MEM_INIT_KEY;
+        ext_mem_write_data((uint8_t *)&mem_key, sizeof(mem_key), 0x0);
+        NRF_LOG_INFO("Updated init key in external memory chip");
+    }
+    else if (mem_key != MEM_INIT_KEY)
+    {
+        NRF_LOG_INFO("Formatting external memory chip");
+        NRF_LOG_FLUSH();
+        /* Formate memory */
+        ext_mem_erase_chip();
+    }
+
+    NRF_LOG_INFO("External memory Initiated");
+}
 
 /* Call this test function from main file to check if the external memory is
    working as expected */

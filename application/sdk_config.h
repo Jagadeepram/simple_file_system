@@ -104,8 +104,8 @@
 // <47=> 47 (P1.15)
 // <4294967295=> Not connected
 
-#ifndef SPI_SCK_PIN
-#define SPI_SCK_PIN 26
+#ifndef SPI_CLK_PIN
+#define SPI_CLK_PIN 4
 #endif
 
 // <o> SPI_MISO_PIN  - Pin number
@@ -217,7 +217,7 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_MOSI_PIN
-#define SPI_MOSI_PIN 29
+#define SPI_MOSI_PIN 28
 #endif
 
 // <o> SPI_SS_PIN  - Pin number
@@ -276,19 +276,12 @@
 #define SPI_nCS_PIN 31
 #endif
 
-
-#ifndef SPI_CLK_PIN
-#define SPI_CLK_PIN 31
-#endif
-
-
 #ifndef SPI_nWP_PIN
-#define SPI_nWP_PIN 31
+#define SPI_nWP_PIN 29
 #endif
-
 
 #ifndef SPI_nHOLD_PIN
-#define SPI_nHOLD_PIN 31
+#define SPI_nHOLD_PIN 3
 #endif
 
 
@@ -1418,7 +1411,7 @@
 // <e> NRF_LOG_BACKEND_RTT_ENABLED - nrf_log_backend_rtt - Log RTT backend
 //==========================================================
 #ifndef NRF_LOG_BACKEND_RTT_ENABLED
-#define NRF_LOG_BACKEND_RTT_ENABLED 0
+#define NRF_LOG_BACKEND_RTT_ENABLED 1
 #endif
 // <o> NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE - Size of buffer for partially processed strings.
 // <i> Size of the buffer is a trade-off between RAM usage and processing.
@@ -1427,7 +1420,7 @@
 // <i> longer one will be fragmented.
 
 #ifndef NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE
-#define NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE 64
+#define NRF_LOG_BACKEND_RTT_TEMP_BUFFER_SIZE 128
 #endif
 
 // <o> NRF_LOG_BACKEND_RTT_TX_RETRY_DELAY_MS - Period before retrying writing to RTT
