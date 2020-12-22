@@ -25,7 +25,7 @@ BUILD_DIR ?= _build
 
 # Binary file name
 TARGET_NAME ?= spi_gcc_nRF52
-TARGET_EXEC ?= $(TARGET_NAME).out
+TARGET_OUT ?= $(TARGET_NAME).out
 TARGET_HEX ?= $(TARGET_NAME).hex
 TARGET_BIN ?= $(TARGET_NAME).bin
 
@@ -40,10 +40,10 @@ DEPS := $(OBJS:.o=.d)
 INC_FLAGS := $(addprefix -I,$(INC))
 INC_FLAGS += $(addprefix -I,$(VPATH))
 
-all: $(BUILD_DIR)/$(TARGET_EXEC) $(BUILD_DIR)/$(TARGET_HEX) $(BUILD_DIR)/$(TARGET_BIN)
+all: $(BUILD_DIR)/$(TARGET_HEX) $(BUILD_DIR)/$(TARGET_BIN) $(BUILD_DIR)/$(TARGET_OUT)
 
-$(BUILD_DIR)/$(TARGET_EXEC): $(OBJS)
-	@echo "Compiling $<";
+$(BUILD_DIR)/$(TARGET_OUT): $(OBJS)
+	@echo "Linking $<";
 	$(NO_ECHO) $(CC) $(OBJS) $(INC_FLAGS) $(LFLAGS) -Wl,-Map=$(@:.out=.map) -o $@
 	$(SIZE) $@
 
