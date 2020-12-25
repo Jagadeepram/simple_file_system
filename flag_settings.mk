@@ -20,6 +20,8 @@ CFLAGS += -mfloat-abi=hard -mfpu=fpv4-sp-d16
 CFLAGS += -ffunction-sections -fdata-sections -fno-strict-aliasing
 CFLAGS += -fno-builtin -fshort-enums
 CFLAGS += -MD
+CFLAGS += -D__HEAP_SIZE=32768
+CFLAGS += -D__STACK_SIZE=32768
 
 # C++ flags common to all targets
 CXXFLAGS += $(OPT)
@@ -34,6 +36,8 @@ SFLAGS += -DBOARD_PCA10056
 SFLAGS += -DCONFIG_GPIO_AS_PINRESET
 SFLAGS += -DFLOAT_ABI_HARD
 SFLAGS += -DNRF52840_XXAA
+SFLAGS += -D__HEAP_SIZE=32768
+SFLAGS += -D__STACK_SIZE=32768
 
 
 LINKER_SCRIPT  := $(SDK_DIR)/spi_gcc_nrf52.ld

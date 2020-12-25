@@ -3,6 +3,8 @@ C_SRC := \
     $(APP_DIR)/src/main.c \
     $(APP_DIR)/src/spi.c \
     $(APP_DIR)/src/ext_mem_driver.c \
+    $(APP_DIR)/src/uart_command.c \
+    $(APP_DIR)/src/led.c \
 
 VPATH := $(APP_DIR)/src/
 
@@ -34,6 +36,7 @@ C_SRC += \
     $(SDK_DIR)/strerror/nrf_strerror.c \
     $(SDK_DIR)/nrfx/legacy/nrf_drv_spi.c \
     $(SDK_DIR)/nrfx/legacy/nrf_drv_uart.c \
+    $(SDK_DIR)/nrfx/legacy/nrf_drv_clock.c \
     $(SDK_DIR)/soc/nrfx_atomic.c \
     $(SDK_DIR)/drivers/src/nrfx_gpiote.c \
     $(SDK_DIR)/drivers/src/prs/nrfx_prs.c \
@@ -41,6 +44,10 @@ C_SRC += \
     $(SDK_DIR)/drivers/src/nrfx_spim.c \
     $(SDK_DIR)/drivers/src/nrfx_uart.c \
     $(SDK_DIR)/drivers/src/nrfx_uarte.c \
+    $(SDK_DIR)/drivers/src/nrfx_clock.c \
+    $(SDK_DIR)/uart/app_uart_fifo.c \
+    $(SDK_DIR)/crc16/crc16.c \
+    $(SDK_DIR)/fifo/app_fifo.c \
     $(SDK_DIR)/bsp/bsp.c \
     $(SDK_DIR)/segger_rtt/SEGGER_RTT.c \
     $(SDK_DIR)/segger_rtt/SEGGER_RTT_Syscalls_GCC.c \
@@ -73,6 +80,9 @@ VPATH += \
     $(SDK_DIR)/drivers/src/prs/ \
     $(SDK_DIR)/drivers/src/ \
     $(SDK_DIR)/bsp/ \
+    $(SDK_DIR)/uart/ \
+    $(SDK_DIR)/crc16/ \
+    $(SDK_DIR)/fifo/ \
     $(SDK_DIR)/segger_rtt/ \
 
 INC := \
@@ -104,6 +114,9 @@ INC := \
     $(SDK_DIR)/sortlist \
     $(SDK_DIR)/memobj \
     $(SDK_DIR)/nrfx \
+    $(SDK_DIR)/uart \
+    $(SDK_DIR)/crc16 \
+    $(SDK_DIR)/fifo \
     $(SDK_DIR)/modules/nrfx/drivers/include \
     $(SDK_DIR)/fprintf \
     $(SDK_DIR)/log/src \

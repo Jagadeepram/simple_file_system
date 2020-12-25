@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2013 - 2019, Nordic Semiconductor ASA
  *
  * All rights reserved.
  *
@@ -37,37 +37,44 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "app_util_platform.h"
-#include "nrf_gpio.h"
-#include "nrf_delay.h"
-#include "boards.h"
-#include "app_error.h"
-#include "nrf_log.h"
-#include "nrf_log_ctrl.h"
-#include "nrf_log_default_backends.h"
-#include "app_timer.h"
-#include "uart_command.h"
-#include "spi.h"
-#include "ext_mem_driver.h"
-#include "led.h"
+/** @file
+ *
+ * @defgroup crc16 CRC16 compute
+ * @{
+ * @ingroup hci_transport
+ *
+ * @brief    This module implements CRC-16-CCITT (polynomial 0x1021) with 0xFFFF initial value.
+ *           The data can be passed in multiple blocks.
+ */
 
-int main(void)
-{
-    lfclk_request();
-    bsp_board_init(BSP_INIT_LEDS);
-    APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
+#ifndef CRC16_H__
+#define CRC16_H__
 
-    APP_ERROR_CHECK(app_timer_init());
+#include <stdint.h>
 
-    uart_init();
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-    ext_mem_init();
-    led_init();
-    NRF_LOG_FLUSH();
+/**@brief Function for calculating CRC-16 in blocks.
+ *
+ * Feed each consecutive data block into this function, along with the current value of p_crc as
+ * returned by the previous call of this function. The first call of this function should pass NULL
+ * as the initial value of the crc in p_crc.
+ *
+ * @param[in] p_data The input data block for computation.
+ * @param[in] size   The size of the input data block in bytes.
+ * @param[in] p_crc  The previous calculated CRC-16 value or NULL if first call.
+ *
+ * @return The updated CRC-16 value, based on the input supplied.
+ */
+uint16_t crc16_compute(uint8_t const * p_data, uint32_t size, uint16_t const * p_crc);
 
-    while (1)
-    {
-        uart_data_handle();
-    }
+
+#ifdef __cplusplus
 }
+#endif
+
+#endif // CRC16_H__
+
+/** @} */

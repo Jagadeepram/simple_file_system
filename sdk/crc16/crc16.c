@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2015 - 2019, Nordic Semiconductor ASA
+ * Copyright (c) 2013 - 2019, Nordic Semiconductor ASA
  *
  * All rights reserved.
  *
@@ -37,37 +37,25 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#include "app_util_platform.h"
-#include "nrf_gpio.h"
-#include "nrf_delay.h"
-#include "boards.h"
-#include "app_error.h"
-#include "nrf_log.h"
-#include "nrf_log_ctrl.h"
-#include "nrf_log_default_backends.h"
-#include "app_timer.h"
-#include "uart_command.h"
-#include "spi.h"
-#include "ext_mem_driver.h"
-#include "led.h"
+#include "sdk_common.h"
+#if NRF_MODULE_ENABLED(CRC16)
+#include "crc16.h"
 
-int main(void)
+#include <stdlib.h>
+
+uint16_t crc16_compute(uint8_t const * p_data, uint32_t size, uint16_t const * p_crc)
 {
-    lfclk_request();
-    bsp_board_init(BSP_INIT_LEDS);
-    APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
-    NRF_LOG_DEFAULT_BACKENDS_INIT();
+    uint16_t crc = (p_crc == NULL) ? 0xFFFF : *p_crc;
 
-    APP_ERROR_CHECK(app_timer_init());
-
-    uart_init();
-
-    ext_mem_init();
-    led_init();
-    NRF_LOG_FLUSH();
-
-    while (1)
+    for (uint32_t i = 0; i < size; i++)
     {
-        uart_data_handle();
+        crc  = (uint8_t)(crc >> 8) | (crc << 8);
+        crc ^= p_data[i];
+        crc ^= (uint8_t)(crc & 0xFF) >> 4;
+        crc ^= (crc << 8) << 4;
+        crc ^= ((crc & 0xFF) << 4) << 1;
     }
+
+    return crc;
 }
+#endif //NRF_MODULE_ENABLED(CRC16)

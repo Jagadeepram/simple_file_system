@@ -2,3 +2,5 @@
 *.settings*
 *_build*
 *.json*
+*__pycache__*
+*debug_log.txt*
