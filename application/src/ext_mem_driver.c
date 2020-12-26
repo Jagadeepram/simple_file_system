@@ -2,31 +2,16 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "nrf_delay.h"
-#include "app_util_platform.h"
-#include "app_error.h"
-#include "spi.h"
 #include "nrf_gpio.h"
-
-
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
+#include "nrf_delay.h"
 
-/* Memory size 8Mbyte */
-#define MEMORY_SIZE         (0x100000)
-#define MEM_START_ADDRESS   (0x000000)
-#define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
-
-#define MEM_PAGE_SIZE         (0x1000)
-#define MEM_SECTOR_SIZE      (0x10000)
-
-/* Total size allocated for a firmware */
-#define FW_ALLOC_SIZE       (0x100000)
-/* Starting address where FW stored */
-#define FW_START_ADDRESS    (0x100000)
-/* End address where FW stored */
-#define FW_END_ADDRESS      (MEM_END_ADDRESS)
+#include "app_util_platform.h"
+#include "app_error.h"
+#include "spi.h"
+#include "ext_mem_driver.h"
 
 /* A key that identify formated memory */
 #define MEM_INIT_KEY        (0xFEEDBABECAFEBEEF)

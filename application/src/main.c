@@ -47,12 +47,12 @@
 #include "nrf_log_default_backends.h"
 #include "app_timer.h"
 #include "uart_command.h"
-#include "spi.h"
-#include "ext_mem_driver.h"
 #include "led.h"
+#include "storage_mngr.h"
 
 int main(void)
 {
+
     lfclk_request();
     bsp_board_init(BSP_INIT_LEDS);
     APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
@@ -62,9 +62,9 @@ int main(void)
 
     uart_init();
 
-    ext_mem_init();
-
     led_init();
+
+    init_storage();
 
     NRF_LOG_FLUSH();
 

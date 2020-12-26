@@ -15,6 +15,17 @@ extern "C" {
 #include "boards.h"
 #include "sdk_config.h"
 
+/* Memory size 1 Mbyte */
+#define MEMORY_SIZE         (0x100000)
+#define MEM_START_ADDRESS   (0x000000)
+#define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
+
+#define MEM_PAGE_SIZE         (0x1000)
+#define MEM_SECTOR_SIZE      (0x10000)
+
+/** Take the last sector () for Garbage collection **/
+#define GC_ADDRESS (MEMORY_SIZE - MEM_SECTOR_SIZE)
+
 /**@brief Initialize External Memory
  *
  */

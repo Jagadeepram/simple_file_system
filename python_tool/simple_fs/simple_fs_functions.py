@@ -122,13 +122,13 @@ class Simple_FS(object):
             temp = read_cmd.payload
             read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
             if (read_cmd.payload == payload):
-                print("Data written at %x" % mem_address)
+                print("Data written at 0x%X" % mem_address)
             else:
                 print("Data write error ")
                 print(read_cmd.payload)
                 print(payload)
         else:
-            print("Data verified at %x" % mem_address)
+            print("Data verified at 0x%X" % mem_address)
         
     def external_memory_erase(self):
         self.cmd_data.clear()

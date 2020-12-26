@@ -5,6 +5,8 @@ C_SRC := \
     $(APP_DIR)/src/ext_mem_driver.c \
     $(APP_DIR)/src/uart_command.c \
     $(APP_DIR)/src/led.c \
+    $(APP_DIR)/src/storage_mngr.c \
+    $(APP_DIR)/src/simple_fs.c \
 
 VPATH := $(APP_DIR)/src/
 
