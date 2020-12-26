@@ -32,6 +32,8 @@ def main():
 
     menu_options = {
         'a': ['data_transfer_test', "Uart Protocol tester"],
+        'b': ['test_ext_mem_driver', "Test External Memory Driver"],
+        'c': ['external_memory_erase', "External Memory Erase"],
         '1': ['exit', "Exit"]
     }
 

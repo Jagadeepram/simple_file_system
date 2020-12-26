@@ -63,7 +63,9 @@ int main(void)
     uart_init();
 
     ext_mem_init();
+
     led_init();
+
     NRF_LOG_FLUSH();
 
     while (1)

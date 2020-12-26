@@ -209,18 +209,11 @@ class Transport(object):
             if (cmd_data.paylen != 0):
                 cmd_data.payload = (data[offset:])
 
-            if (cmd_data.cmd == Command.CMD_ADVERTISEMENT_PKTS):
-                return cmd_data
-            elif (cmd_data.cmd == Command.CMD_NRF_RESET_REASON):
-                self.logger.info("Reset reason: %d", struct.unpack('<I', (cmd_data.payload[0: cmd_data.paylen]))[0])
-            else:
-                self.display_cmd(cmd_data, "RX")
-                self.resp_list.append(cmd_data)
-                return None
+            self.display_cmd(cmd_data, "RX")
+            self.resp_list.append(cmd_data)
         else:
             """ Ack for alert packet received """
             self.ack_list.append(STX_ETX)
-            return None
 
     def clear_response_list(self):
         self.resp_list.clear()

@@ -20,9 +20,6 @@ import zipfile
 import shutil
 import struct
 
-FILE = 0
-FOLDER = 1
-
 """ File to log debug information """
 DEBUG_FILE = 'debug_log.txt'
 
@@ -92,3 +89,50 @@ class Simple_FS(object):
             else:
                 print("%d:Test success Round trip: %s seconds" % (i, (stop - start)))
 
+    def test_ext_mem_driver(self):
+        mem_address = 0x23000
+        test_data_len = 50
+#         start = time.time()
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_EXT_MEM_READ
+        payload = [(i + 20) for i in range (test_data_len)]
+        self.cmd_data.payload = payload
+        arg = [mem_address, len(payload)]
+        self.cmd_data.arg = arg
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        read_cmd = self.transport.read_response(msg_id=msg_id)
+#         stop = time.time()
+        temp = read_cmd.payload
+        read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+        if (read_cmd.payload != payload):
+            """ Data does not exists, write it """
+
+            """ Perform page erase """
+            self.cmd_data.cmd = Command.COMMAND_EXT_MEM_PAGE_ERASE
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            self.transport.read_response(msg_id=msg_id)
+            """ Write the data """
+            self.cmd_data.cmd = Command.COMMAND_EXT_MEM_WRITE
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            self.transport.read_response(msg_id=msg_id)
+            """ Read it again """
+            self.cmd_data.cmd = Command.COMMAND_EXT_MEM_READ
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            read_cmd = self.transport.read_response(msg_id=msg_id)
+            temp = read_cmd.payload
+            read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+            if (read_cmd.payload == payload):
+                print("Data written at %x" % mem_address)
+            else:
+                print("Data write error ")
+                print(read_cmd.payload)
+                print(payload)
+        else:
+            print("Data verified at %x" % mem_address)
+        
+    def external_memory_erase(self):
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_EXT_MEM_CHIP_ERASE
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        self.transport.read_response(msg_id=msg_id)
+        print("Memory chip erased")

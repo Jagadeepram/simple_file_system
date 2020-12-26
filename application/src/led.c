@@ -11,7 +11,7 @@
 
 
 /* LED Blink period */
-#define LED_BLINK_MS 500
+#define LED_BLINK_MS 1000
 
 /* Create timer */
 APP_TIMER_DEF(m_led_blink_timer);

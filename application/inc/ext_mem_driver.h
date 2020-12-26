@@ -15,7 +15,6 @@ extern "C" {
 #include "boards.h"
 #include "sdk_config.h"
 
-
 /**@brief Initialize External Memory
  *
  */
@@ -25,13 +24,13 @@ void ext_mem_init(void);
  *
  * @param[in]  uint32_t Address belongs to the page to be deleted
  */
-void ext_mem_erase_page(uint32_t start_address);
+uint32_t ext_mem_erase_page(uint32_t start_address);
 
 /**@brief Erase sector
  *
  * @param[in]  uint32_t Address belongs to the sector to be deleted
  */
-void ext_mem_erase_sector(uint32_t start_address);
+uint32_t ext_mem_erase_sector(uint32_t start_address);
 
 /**@brief Erase entire chip
  */

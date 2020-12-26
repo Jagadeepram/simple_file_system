@@ -14,7 +14,7 @@
 #include "nrf_log_default_backends.h"
 
 /* Memory size 8Mbyte */
-#define MEMORY_SIZE         (0x800000)
+#define MEMORY_SIZE         (0x100000)
 #define MEM_START_ADDRESS   (0x000000)
 #define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
 
@@ -37,8 +37,8 @@
 #define MAX_PROGRAM_LEN         (256)
 #define MAX_PROG_LEN_MASK       (0xFF)
 
-/* Erase Full chip (8 MEGA Byte) */
-#define ERASE_SIZE_8M   (8000)
+/* Erase Full chip (1 MEGA Byte) */
+#define ERASE_SIZE_1M   (1000)
 
 /* Erase 64K sector size */
 #define ERASE_SIZE_64K  (64)
@@ -110,7 +110,7 @@ static ret_code_t write_enable(void)
     uint8_t cmd = WRITE_ENABLE_CMD;
     uint8_t temp;
 
-    err_code = spi_transfer(&cmd, 1, &temp, 1);
+    err_code = spi_transfer(&cmd, 1, &temp, 0);
 
     return err_code;
 }
@@ -327,11 +327,11 @@ static ret_code_t ext_mem_erase(uint32_t address, uint32_t size)
         cmd[0] = ERASE_64K_CMD;
         count = 1;
     }
-    else if (size == ERASE_SIZE_8M)
+    else if (size == ERASE_SIZE_1M)
     {
         cmd[0] = ERASE_64K_CMD;
-        /* 8M divided by 64K */
-        count = 128;
+        /* 1M divided by 64K */
+        count = 16;
     }
     else
     {
@@ -383,19 +383,19 @@ void ext_mem_erase_chip(void)
 {
     uint64_t mem_key = MEM_INIT_KEY;
 
-    ext_mem_erase(0x0, ERASE_SIZE_8M);
+    ext_mem_erase(0x0, ERASE_SIZE_1M);
      /* Write memory key after formatting */
     ext_mem_write_data((uint8_t *)&mem_key, sizeof(mem_key), 0x0);
 }
 
-void ext_mem_erase_page(uint32_t start_address)
+uint32_t ext_mem_erase_page(uint32_t start_address)
 {
-    ext_mem_erase(start_address, ERASE_SIZE_4K);
+    return ext_mem_erase(start_address, ERASE_SIZE_4K);
 }
 
-void ext_mem_erase_sector(uint32_t start_address)
+uint32_t ext_mem_erase_sector(uint32_t start_address)
 {
-    ext_mem_erase(start_address, ERASE_SIZE_64K);
+    return ext_mem_erase(start_address, ERASE_SIZE_64K);
 }
 
 void ext_mem_init(void)
@@ -429,7 +429,7 @@ void ext_mem_init(void)
     {
         NRF_LOG_INFO("Formatting external memory chip");
         NRF_LOG_FLUSH();
-        /* Formate memory */
+        /* Format memory */
         ext_mem_erase_chip();
     }
 
@@ -438,7 +438,7 @@ void ext_mem_init(void)
 
 /* Call this test function from main file to check if the external memory is
    working as expected */
-#define TEST_ADDRESS (4096*4)
+#define TEST_ADDRESS (4096*6)
 #define TEST_ARRAY_SIZE 250
 void ext_mem_test(void)
 {

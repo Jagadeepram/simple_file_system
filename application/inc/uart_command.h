@@ -77,10 +77,15 @@ typedef struct
 
 /* Command to test UART protocol */
 #define COMMAND_UART_TEST             0x0001
+/* Command to write raw data into ext mem */
+#define COMMAND_EXT_MEM_WRITE         0x0010
+/* Command to read raw data into ext mem */
+#define COMMAND_EXT_MEM_READ          0x0011
+/* Command to perform page erase */
+#define COMMAND_EXT_MEM_PAGE_ERASE    0x0012
+/* Command to perform chip erase */
+#define COMMAND_EXT_MEM_CHIP_ERASE    0x0013
 
-
-/**@brief Function test UART communication */
-void cmd_uart_test(uart_cmd_t *p_uart_cmd);
 
 /**@brief Function for writing the atomic FIFO to UART. */
 void atfifo_to_uart(void);
@@ -91,8 +96,19 @@ void uart_init(void);
 void fifo_init(void);
 /**@brief Function for handling UART RX. */
 void uart_data_handle(void);
-/**@brief Reset reason*/
-void cmd_reset_reason(void);
+
+/********** Command Functions ********************/
+/**@brief Function to test UART communication */
+void cmd_uart_test(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read data from a specific address */
+void cmd_ext_mem_read(uart_cmd_t *p_uart_cmd);
+/**@brief Function to write from a specific address */
+void cmd_ext_mem_write(uart_cmd_t *p_uart_cmd);
+/**@brief Function to erase a page */
+void cmd_ext_mem_page_erase(uart_cmd_t *p_uart_cmd);
+/**@brief Function to erase entire chip */
+void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd);
+
 #ifdef __cplusplus
 }
 #endif

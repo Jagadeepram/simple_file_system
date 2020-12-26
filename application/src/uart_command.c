@@ -8,34 +8,26 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include "nordic_common.h"
-#include "nrf_sdm.h"
-#include "nrf_nvic.h"
 
-#include "app_util.h"
-#include "app_error.h"
-#include "app_util.h"
-#include "app_timer.h"
-
-#include "nrf_power.h"
-
-#include "nrf_atfifo.h"
-#include "uart_command.h"
-#include "boards.h"
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 #include "nrf_log_default_backends.h"
 #include "nrf_drv_uart.h"
-#include "nrf_assert.h"
 #include "nrf_delay.h"
-#include "nrf_uart.h"
+
+#include "app_timer.h"
+#include "boards.h"
 #include "app_uart.h"
 #include "crc16.h"
+
+#include "uart_command.h"
+#include "ext_mem_driver.h"
 
 
 /* When UART is used for communication with the host do not use flow control.*/
 #define UART_HWFC NRF_UART_HWFC_DISABLED
 
+/* UART Special characters used in packet framing */
 #define STX 0x02
 #define ETX 0x03
 #define DLE 0x04
@@ -81,7 +73,11 @@ typedef struct
 
 cmd_struct_t cmd_struct[] =
 {
-    { COMMAND_UART_TEST, cmd_uart_test }
+    { COMMAND_UART_TEST, cmd_uart_test },
+    { COMMAND_EXT_MEM_READ, cmd_ext_mem_read },
+    { COMMAND_EXT_MEM_WRITE, cmd_ext_mem_write },
+    { COMMAND_EXT_MEM_PAGE_ERASE, cmd_ext_mem_page_erase },
+    { COMMAND_EXT_MEM_CHIP_ERASE, cmd_ext_mem_chip_erase }
 };
 
 /**@brief Function for handling UART errors.
@@ -247,13 +243,6 @@ static void parse_cmd(uint16_t rx_data_len)
     memcpy(m_uart_cmd.payload, m_rx_buffer + index, m_uart_cmd.paylen);
 }
 
-void cmd_uart_test(uart_cmd_t *p_uart_cmd)
-{
-    /* Do nothing, the goal of this function is to transfer all the incoming data.
-       But set the response to zero */
-    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
-}
-
 static void send_cmd_data(uart_cmd_t *p_uart_cmd)
 {
     uint16_t tx_data_len;
@@ -375,7 +364,6 @@ void uart_data_handle(void)
                     {
                          uart_put(STX);
                          uart_put(ETX);
-                         NRF_LOG_INFO("UART:Alert packet sent");
                     }
                     else
                     {
@@ -383,8 +371,6 @@ void uart_data_handle(void)
                         parse_cmd(rx_data_len);
                         execute_send_cmd();
                         clear_cmd();
-                        NRF_LOG_INFO("UART:Completed incoming request with %d bytes", rx_data_len);
-                        NRF_LOG_FLUSH();
                     }
                     m_uart_rx_state = UART_RX_STATE_BEGIN;
                 }
@@ -410,4 +396,36 @@ void uart_data_handle(void)
                  break;
       }
    }
+}
+
+void cmd_uart_test(uart_cmd_t *p_uart_cmd)
+{
+    /* Do nothing, the goal of this function is to transfer all the incoming data.
+       But set the response to zero */
+    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
+}
+
+void cmd_ext_mem_write(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->arg[1] = ext_mem_write_data(p_uart_cmd->payload, p_uart_cmd->paylen, p_uart_cmd->arg[0]);
+    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
+    p_uart_cmd->nbr_arg = 2;
+}
+
+void cmd_ext_mem_read(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->arg[1] = ext_mem_read_data(p_uart_cmd->payload, p_uart_cmd->arg[1], p_uart_cmd->arg[0]);
+    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
+    p_uart_cmd->nbr_arg = 2;
+}
+
+void cmd_ext_mem_page_erase(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->cmd_resp = ext_mem_erase_page(p_uart_cmd->arg[0]);
+}
+
+void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd)
+{
+    ext_mem_erase_chip();
+    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
 }

@@ -39,7 +39,6 @@ SFLAGS += -DNRF52840_XXAA
 SFLAGS += -D__HEAP_SIZE=32768
 SFLAGS += -D__STACK_SIZE=32768
 
-
 LINKER_SCRIPT  := $(SDK_DIR)/spi_gcc_nrf52.ld
 # Linker flags
 LFLAGS += $(OPT)
