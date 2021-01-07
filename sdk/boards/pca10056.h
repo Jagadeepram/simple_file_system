@@ -97,6 +97,12 @@ extern "C" {
 #define BSP_QSPI_IO2_PIN   22
 #define BSP_QSPI_IO3_PIN   23
 
+#define BSP_SPI_SCK_PIN     19
+#define BSP_SPI_nCS_PIN     17
+#define BSP_SPI_MOSI_PIN    20
+#define BSP_SPI_MISO_PIN    21
+#define BSP_SPI_nWP_PIN     22
+#define BSP_SPI_nHOLD_PIN   23
 
 // serialization APPLICATION board - temp. setup for running serialized MEMU tests
 #define SER_APP_RX_PIN              NRF_GPIO_PIN_MAP(1,13)    // UART RX pin number.

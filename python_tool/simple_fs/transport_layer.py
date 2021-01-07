@@ -1,9 +1,3 @@
-# Copyright (c) 2020 Essity AB
-#
-# All rights are reserved.
-# Proprietary and confidential.
-# Unauthorized copying of this file, via any medium is strictly prohibited.
-# Any use is subject to an appropriate license granted by Essity AB
 
 import serial
 import struct
@@ -129,8 +123,11 @@ class Transport(object):
                 self.logger.info("    Arg[%d] %d" % (i, cmd_data.arg[i]))
 
             if (cmd_data.paylen):
-                payload = [hex(i) for i in cmd_data.payload]
-                self.logger.info("Payload: " + '{}'.format(','.join(x for x in payload)))
+                try:
+                    payload = bytearray(cmd_data.payload)
+                except TypeError:
+                    payload = bytearray(cmd_data.payload.encode('UTF-8'))
+                self.logger.info("Payload: " + str(payload))
 
     def crc16(self, p_data):
         

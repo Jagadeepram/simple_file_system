@@ -1,9 +1,3 @@
-# Copyright (c) 2020 Essity AB
-#
-# All rights are reserved.
-# Proprietary and confidential.
-# Unauthorized copying of this file, via any medium is strictly prohibited.
-# Any use is subject to an appropriate license granted by Essity AB
 
 from .transport_layer import Cmd_Data
 from .transport_layer import Transport
@@ -19,6 +13,8 @@ import logging
 import zipfile
 import shutil
 import struct
+from tkinter import *
+from tkinter import scrolledtext
 
 """ File to log debug information """
 DEBUG_FILE = 'debug_log.txt'
@@ -62,10 +58,10 @@ class Simple_FS(object):
 
     def data_transfer_test(self):
 
-        nbr_test = 5
+        nbr_test = 100
         for i in range(nbr_test):
 
-            test_data_len = 50
+            test_data_len = 500
             start = time.time()
             self.cmd_data.clear()
             self.cmd_data.cmd = Command.CMD_UART_TRANSFER
@@ -129,10 +125,66 @@ class Simple_FS(object):
                 print(payload)
         else:
             print("Data verified at 0x%X" % mem_address)
-        
+
     def external_memory_erase(self):
         self.cmd_data.clear()
         self.cmd_data.cmd = Command.COMMAND_EXT_MEM_CHIP_ERASE
         msg_id = self.transport.write_cmd(self.cmd_data)
         self.transport.read_response(msg_id=msg_id)
         print("Memory chip erased")
+
+    def file_test(self):
+        for __ in range (10):
+            data = self.file_write()
+#             print(data)
+            read_data = self.file_read()
+            if (data == read_data):
+                print("match")
+            else:
+                print("mismatch")
+
+    def file_read(self):
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_SFS_READ
+        self.cmd_data.arg = [0x10001]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        read_cmd = self.transport.read_response(msg_id=msg_id)
+        temp = read_cmd.payload
+        read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+        if (read_cmd.cmd != 0):
+            print("File not found " + str(read_cmd.cmd))
+
+        return read_cmd.payload
+
+    def file_write(self):
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_SFS_WRITE
+        self.cmd_data.payload = [(random.randint(65, 90)) for __ in range (1000)]
+        self.cmd_data.arg = [0x10001]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        self.transport.read_response(msg_id=msg_id)
+        return self.cmd_data.payload
+
+    def GUI_app(self):
+        window = Tk()
+        window.title("Welcome to LikeGeeks app")
+        window.geometry('350x400')
+        txt = scrolledtext.ScrolledText(window, width=60, height=60)
+        txt.grid(column=0, row=0)
+
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_EXT_MEM_READ
+        mem_address = 0x1000 * 10
+        data_len = 0x1000
+        self.cmd_data.arg = [mem_address, data_len]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        read_cmd = self.transport.read_response(msg_id=msg_id)
+        temp = read_cmd.payload
+        read_cmd.payload = [hex(temp[j]) for j in range (read_cmd.paylen)]
+#         if (read_cmd.cmd == 0):
+#             print(read_cmd.payload)
+#         else:
+#             print("File not found " + str(read_cmd.cmd))
+        txt.insert(INSERT, read_cmd.payload)
+
+        window.mainloop()

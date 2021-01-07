@@ -18,6 +18,7 @@ enum {
 };
 
 sfs_status_t init_storage(void);
+sfs_status_t uninit_storage(void);
 
 
 #ifdef __cplusplus

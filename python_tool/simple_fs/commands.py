@@ -1,9 +1,4 @@
-# Copyright (c) 2020 Essity AB
-#
-# All rights are reserved.
-# Proprietary and confidential.
-# Unauthorized copying of this file, via any medium is strictly prohibited.
-# Any use is subject to an appropriate license granted by Essity AB
+
 
 from abc import ABCMeta
 import enum
@@ -27,3 +22,7 @@ class Command(CommandBase):
     COMMAND_EXT_MEM_PAGE_ERASE = 0x0012
     """ External Memory chip erase """
     COMMAND_EXT_MEM_CHIP_ERASE = 0x0013
+    """ Simple File System Read """
+    COMMAND_SFS_READ = 0x0100
+    """ Simple File System Write """
+    COMMAND_SFS_WRITE = 0x0101

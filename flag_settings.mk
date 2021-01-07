@@ -1,6 +1,6 @@
 
 # Optimization flags
-OPT = -Og -g3
+OPT = -O0 -g3
 # Uncomment the line below to enable link time optimization
 #OPT += -flto
 

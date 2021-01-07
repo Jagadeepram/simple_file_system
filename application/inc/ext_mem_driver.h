@@ -16,7 +16,7 @@ extern "C" {
 #include "sdk_config.h"
 
 /* Memory size 1 Mbyte */
-#define MEMORY_SIZE         (0x100000)
+#define MEMORY_SIZE         (0x800000)
 #define MEM_START_ADDRESS   (0x000000)
 #define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
 
@@ -35,17 +35,17 @@ void ext_mem_init(void);
  *
  * @param[in]  uint32_t Address belongs to the page to be deleted
  */
-uint32_t ext_mem_erase_page(uint32_t start_address);
+uint32_t memory_erase_page(uint32_t start_address);
 
 /**@brief Erase sector
  *
  * @param[in]  uint32_t Address belongs to the sector to be deleted
  */
-uint32_t ext_mem_erase_sector(uint32_t start_address);
+uint32_t memory_erase_sector(uint32_t start_address);
 
 /**@brief Erase entire chip
  */
-void ext_mem_erase_chip(void);
+void memory_erase_chip(void);
 
 /**@brief Write data to the external memory
  *
@@ -55,7 +55,7 @@ void ext_mem_erase_chip(void);
  *
  * @return ret_code_t
  */
-uint32_t ext_mem_write_data(uint8_t *data, uint32_t len, uint32_t address);
+ret_code_t memory_write(uint32_t address, uint8_t *data, uint32_t len);
 
 /**@brief Read data from the external memory
  *
@@ -65,7 +65,7 @@ uint32_t ext_mem_write_data(uint8_t *data, uint32_t len, uint32_t address);
  *
  * @return ret_code_t
  */
-uint32_t ext_mem_read_data(uint8_t *data, uint32_t len, uint32_t address);
+ret_code_t memory_read(uint32_t address, uint8_t *data, uint32_t len);
 
 /**@brief Perform external memory test for read and write
  */

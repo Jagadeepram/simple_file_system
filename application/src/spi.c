@@ -55,7 +55,8 @@ ret_code_t spi_txrx(const uint8_t *tx_buff, size_t tx_len, uint8_t *rx_buff, siz
 
     err_code = nrfx_spim_xfer(&m_spi.u.spim, &spim_xfer_desc, 0);
 
-    while ((m_spi_xfer_done == false) && (m_spi_txrx_timeout == 0));
+    while ((m_spi_xfer_done == false) && (m_spi_txrx_timeout == 0))
+        ;
 
     app_timer_stop(m_spi_txrx_timer);
 

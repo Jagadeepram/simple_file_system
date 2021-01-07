@@ -1,4 +1,3 @@
-
 /**
  * @brief BLE Running Speed and Cadence Collector application main file.
  *
@@ -22,22 +21,21 @@
 
 #include "uart_command.h"
 #include "ext_mem_driver.h"
+#include "simple_fs.h"
 
-
-/* When UART is used for communication with the host do not use flow control.*/
+/** When UART is used for communication with the host do not use flow control.*/
 #define UART_HWFC NRF_UART_HWFC_DISABLED
 
-/* UART Special characters used in packet framing */
+/** UART Special characters used in packet framing */
 #define STX 0x02
 #define ETX 0x03
 #define DLE 0x04
 
-
-/* Optimal to have half of the maximum packet length (4096 bytes) */
+/** Optimal to have half of the maximum packet length (4096 bytes) */
 #define UART_RX_FIFO_SIZE (1024 * 2)
 #define UART_TX_FIFO_SIZE (1024 * 2)
 
-/* Should be more than the packet length (4096 bytes) */
+/** Should be more than the packet length (4096 bytes) */
 #define UART_RX_BUFFER_SIZE (1024 * 5)
 #define UART_TX_BUFFER_SIZE (1024 * 5)
 
@@ -46,9 +44,7 @@
  */
 typedef enum
 {
-  UART_RX_STATE_NONE = 0,
-  UART_RX_STATE_BEGIN,
-  UART_RX_STATE_PROGRESS
+    UART_RX_STATE_NONE = 0, UART_RX_STATE_BEGIN, UART_RX_STATE_PROGRESS
 } uart_rx_state_t;
 
 typedef void (*cmd_function_t)(uart_cmd_t *p_uart_cmd);
@@ -62,6 +58,22 @@ static uart_rx_state_t m_uart_rx_state = UART_RX_STATE_NONE;
 static bool m_data_ready_to_send = false;
 static bool m_crc_match_status = true;
 
+/********** Command Functions ********************/
+/**@brief Function to test UART communication */
+void cmd_uart_test(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read data from a specific address */
+void cmd_ext_mem_read(uart_cmd_t *p_uart_cmd);
+/**@brief Function to write from a specific address */
+void cmd_ext_mem_write(uart_cmd_t *p_uart_cmd);
+/**@brief Function to erase a page */
+void cmd_ext_mem_page_erase(uart_cmd_t *p_uart_cmd);
+/**@brief Function to erase entire chip */
+void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read sfs */
+void cmd_sfs_read(uart_cmd_t *p_uart_cmd);
+/**@brief Function to write sfs */
+void cmd_sfs_write(uart_cmd_t *p_uart_cmd);
+
 /**
  * @brief Command structure for command handling.
  */
@@ -73,11 +85,13 @@ typedef struct
 
 cmd_struct_t cmd_struct[] =
 {
-    { COMMAND_UART_TEST, cmd_uart_test },
-    { COMMAND_EXT_MEM_READ, cmd_ext_mem_read },
-    { COMMAND_EXT_MEM_WRITE, cmd_ext_mem_write },
-    { COMMAND_EXT_MEM_PAGE_ERASE, cmd_ext_mem_page_erase },
-    { COMMAND_EXT_MEM_CHIP_ERASE, cmd_ext_mem_chip_erase }
+        { COMMAND_UART_TEST, cmd_uart_test },
+        { COMMAND_EXT_MEM_READ, cmd_ext_mem_read },
+        { COMMAND_EXT_MEM_WRITE, cmd_ext_mem_write },
+        { COMMAND_EXT_MEM_PAGE_ERASE, cmd_ext_mem_page_erase },
+        { COMMAND_EXT_MEM_CHIP_ERASE, cmd_ext_mem_chip_erase },
+        { COMMAND_SFS_READ, cmd_sfs_read },
+        { COMMAND_SFS_WRITE, cmd_sfs_write }
 };
 
 /**@brief Function for handling UART errors.
@@ -88,7 +102,7 @@ void uart_error_handle(app_uart_evt_t * p_event)
 {
     if (p_event->evt_type == APP_UART_COMMUNICATION_ERROR)
     {
-        /* Wait for 5 seconds to avoid continues restart before WP is ready during bootup */
+        /** Wait for 5 seconds to avoid continues restart before WP is ready during bootup */
         nrf_delay_ms(5000);
         NRF_LOG_INFO("UART error");
         //APP_ERROR_HANDLER(p_event->data.error_communication);
@@ -104,27 +118,19 @@ void uart_init(void)
 {
     uint32_t err_code;
 
-    const app_uart_comm_params_t comm_params =
-    {
-        RX_PIN_NUMBER,
-        TX_PIN_NUMBER,
-        RTS_PIN_NUMBER,
-        CTS_PIN_NUMBER,
-        UART_HWFC,
-        false,
-        NRF_UART_BAUDRATE_115200
-    };
+    const app_uart_comm_params_t comm_params = {
+    RX_PIN_NUMBER,
+    TX_PIN_NUMBER,
+    RTS_PIN_NUMBER,
+    CTS_PIN_NUMBER,
+    UART_HWFC,
+    false, NRF_UART_BAUDRATE_115200 };
 
-    APP_UART_FIFO_INIT(&comm_params,
-       UART_RX_FIFO_SIZE,
-       UART_TX_FIFO_SIZE,
-       uart_error_handle,
-       _PRIO_APP_HIGH,
-       err_code);
+    APP_UART_FIFO_INIT(&comm_params, UART_RX_FIFO_SIZE, UART_TX_FIFO_SIZE, uart_error_handle, _PRIO_APP_HIGH, err_code);
 
     APP_ERROR_CHECK(err_code);
 
-    /* Set UART data receive state to the BEGIN to receive data */
+    /** Set UART data receive state to the BEGIN to receive data */
     m_uart_rx_state = UART_RX_STATE_BEGIN;
 
     NRF_LOG_INFO("Initialize UART FIFO");
@@ -167,7 +173,7 @@ static void uart_write_buffer(void *buf, int len)
     ASSERT(buf);
 #endif
 
-    uint8_t *ptr = (uint8_t *) buf;
+    uint8_t *ptr = (uint8_t *)buf;
     uint32_t i;
 
     for (i = 0; i < len; i++)
@@ -184,7 +190,7 @@ cmd_function_t get_cmd_function(uart_cmd_t *p_uart_cmd)
 {
     cmd_function_t cmd_function = NULL;
     uint16_t i;
-    uint16_t nbr_of_cmds= sizeof(cmd_struct)/sizeof(cmd_struct_t);
+    uint16_t nbr_of_cmds = sizeof(cmd_struct) / sizeof(cmd_struct_t);
 
     if (p_uart_cmd == NULL)
     {
@@ -210,11 +216,11 @@ static void parse_cmd(uint16_t rx_data_len)
     memcpy(&m_uart_cmd.crc, m_rx_buffer + index, sizeof(m_uart_cmd.crc));
     index += sizeof(m_uart_cmd.crc);
 
-    /* Check crc16 */
+    /** Check crc16 */
     crc16 = crc16_compute(m_rx_buffer + index, rx_data_len - index, NULL);
     if (crc16 != m_uart_cmd.crc)
     {
-        /* Set CRC mismatch status */
+        /** Set CRC mismatch status */
         m_crc_match_status = false;
         m_uart_cmd.nbr_arg = ZERO;
         return;
@@ -235,8 +241,8 @@ static void parse_cmd(uint16_t rx_data_len)
 
     for (uint16_t i = 0; i < m_uart_cmd.nbr_arg; i++)
     {
-       memcpy(&m_uart_cmd.arg[i], m_rx_buffer + index, sizeof(m_uart_cmd.arg[0]));
-       index += sizeof(m_uart_cmd.arg[0]);
+        memcpy(&m_uart_cmd.arg[i], m_rx_buffer + index, sizeof(m_uart_cmd.arg[0]));
+        index += sizeof(m_uart_cmd.arg[0]);
     }
 
     m_uart_cmd.paylen = rx_data_len - index;
@@ -251,7 +257,7 @@ static void send_cmd_data(uart_cmd_t *p_uart_cmd)
 
     if (m_crc_match_status == false)
     {
-        /* UART Packet CRC Error */
+        /** UART Packet CRC Error */
         p_uart_cmd->cmd_resp = UART_RESP_PKT_CRC_ERROR;
         p_uart_cmd->nbr_arg = 0;
         p_uart_cmd->paylen = 0;
@@ -261,7 +267,7 @@ static void send_cmd_data(uart_cmd_t *p_uart_cmd)
     msg_data_len = sizeof(p_uart_cmd->msg_id);
     msg_data_len += sizeof(p_uart_cmd->cmd_resp);
     msg_data_len += sizeof(p_uart_cmd->nbr_arg);
-    msg_data_len += p_uart_cmd->nbr_arg*sizeof(p_uart_cmd->arg[0]);
+    msg_data_len += p_uart_cmd->nbr_arg * sizeof(p_uart_cmd->arg[0]);
     msg_data_len += p_uart_cmd->paylen;
 
     memcpy(m_tx_buffer + tx_data_len, &p_uart_cmd->msg_id, sizeof(p_uart_cmd->msg_id));
@@ -275,15 +281,15 @@ static void send_cmd_data(uart_cmd_t *p_uart_cmd)
 
     for (uint16_t i = 0; i < p_uart_cmd->nbr_arg; i++)
     {
-       memcpy(m_tx_buffer + tx_data_len, &p_uart_cmd->arg[i], sizeof(p_uart_cmd->arg[0]));
-       tx_data_len += sizeof(p_uart_cmd->arg[0]);
+        memcpy(m_tx_buffer + tx_data_len, &p_uart_cmd->arg[i], sizeof(p_uart_cmd->arg[0]));
+        tx_data_len += sizeof(p_uart_cmd->arg[0]);
     }
 
     memcpy(m_tx_buffer + tx_data_len, p_uart_cmd->payload, p_uart_cmd->paylen);
     tx_data_len += p_uart_cmd->paylen;
 
     crc16 = crc16_compute(m_tx_buffer + sizeof(p_uart_cmd->crc), msg_data_len, NULL);
-    /* Update calculated CRC */
+    /** Update calculated CRC */
     memcpy(m_tx_buffer, &crc16, sizeof(p_uart_cmd->crc));
 
     uart_put(STX);
@@ -297,20 +303,20 @@ static void execute_send_cmd(void)
 
     if (cmd_function != NULL)
     {
-        /* Execute the command when CRC matched */
+        /** Execute the command when CRC matched */
         if (m_crc_match_status == true)
         {
-           cmd_function(&m_uart_cmd);
+            cmd_function(&m_uart_cmd);
         }
     }
     else
     {
         clear_cmd();
-        /* Send the error COMMAND NOT SUPPORTED */
+        /** Send the error COMMAND NOT SUPPORTED */
         m_uart_cmd.cmd_resp = UART_RESP_CMD_NOT_SUPPORTED;
     }
 
-    /* Send the result after executing command */
+    /** Send the result after executing command */
     send_cmd_data(&m_uart_cmd);
 }
 
@@ -325,45 +331,44 @@ static void clear_cmd(void)
 
 void uart_data_handle(void)
 {
-   uint8_t cr;
-   uint32_t err_code;
-   static uint16_t rx_data_len;
-   static uint8_t negate_byte;
+    uint8_t cr;
+    uint32_t err_code;
+    static uint16_t rx_data_len;
+    static uint8_t negate_byte;
 
+    if ((m_data_ready_to_send == true) && (m_uart_rx_state == UART_RX_STATE_BEGIN))
+    {
+        send_cmd_data(&m_uart_cmd);
+        m_data_ready_to_send = false;
+    }
 
-   if ((m_data_ready_to_send == true) && (m_uart_rx_state == UART_RX_STATE_BEGIN))
-   {
-       send_cmd_data(&m_uart_cmd);
-       m_data_ready_to_send = false;
-   }
+    err_code = app_uart_get(&cr);
 
-   err_code = app_uart_get(&cr);
-
-   if (err_code == NRF_SUCCESS)
-   {
-      switch(m_uart_rx_state)
-      {
-           case UART_RX_STATE_NONE:
-           case UART_RX_STATE_BEGIN:
-                 if (cr == STX)
-                 {
-                     rx_data_len = 0;
-                     negate_byte = 0;
-                     m_uart_rx_state = UART_RX_STATE_PROGRESS;
-                 }
-                 break;
-           case UART_RX_STATE_PROGRESS:
+    if (err_code == NRF_SUCCESS)
+    {
+        switch (m_uart_rx_state)
+        {
+            case UART_RX_STATE_NONE:
+            case UART_RX_STATE_BEGIN:
+                if (cr == STX)
+                {
+                    rx_data_len = 0;
+                    negate_byte = 0;
+                    m_uart_rx_state = UART_RX_STATE_PROGRESS;
+                }
+                break;
+            case UART_RX_STATE_PROGRESS:
                 if (cr == STX && negate_byte == 0)
                 {
-                     rx_data_len = 0;
-                     m_uart_rx_state = UART_RX_STATE_PROGRESS;
+                    rx_data_len = 0;
+                    m_uart_rx_state = UART_RX_STATE_PROGRESS;
                 }
                 else if (cr == ETX && negate_byte == 0)
                 {
                     if (rx_data_len == 0)
                     {
-                         uart_put(STX);
-                         uart_put(ETX);
+                        uart_put(STX);
+                        uart_put(ETX);
                     }
                     else
                     {
@@ -380,52 +385,67 @@ void uart_data_handle(void)
                 }
                 else
                 {
-                   if (negate_byte == 1)
-                   {
-                       m_rx_buffer[rx_data_len] = ~cr;
-                       negate_byte = 0;
-                   }
-                   else
-                   {
-                       m_rx_buffer[rx_data_len] = cr;
-                   }
-                   rx_data_len++;
+                    if (negate_byte == 1)
+                    {
+                        m_rx_buffer[rx_data_len] = ~cr;
+                        negate_byte = 0;
+                    }
+                    else
+                    {
+                        m_rx_buffer[rx_data_len] = cr;
+                    }
+                    rx_data_len++;
                 }
                 break;
             default:
-                 break;
-      }
-   }
+                break;
+        }
+    }
 }
 
 void cmd_uart_test(uart_cmd_t *p_uart_cmd)
 {
-    /* Do nothing, the goal of this function is to transfer all the incoming data.
-       But set the response to zero */
+    /** Do nothing, the goal of this function is to transfer all the incoming data.
+     But set the response to zero */
     p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
 }
 
 void cmd_ext_mem_write(uart_cmd_t *p_uart_cmd)
 {
-    p_uart_cmd->arg[1] = ext_mem_write_data(p_uart_cmd->payload, p_uart_cmd->paylen, p_uart_cmd->arg[0]);
-    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
-    p_uart_cmd->nbr_arg = 2;
+    p_uart_cmd->cmd_resp = memory_write( p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
 }
 
 void cmd_ext_mem_read(uart_cmd_t *p_uart_cmd)
 {
-    p_uart_cmd->arg[1] = ext_mem_read_data(p_uart_cmd->payload, p_uart_cmd->arg[1], p_uart_cmd->arg[0]);
-    p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
-    p_uart_cmd->nbr_arg = 2;
+    p_uart_cmd->cmd_resp = memory_read(p_uart_cmd->arg[0],p_uart_cmd->payload, p_uart_cmd->arg[1]);
+    p_uart_cmd->paylen = p_uart_cmd->arg[1];
 }
 
 void cmd_ext_mem_page_erase(uart_cmd_t *p_uart_cmd)
 {
-    p_uart_cmd->cmd_resp = ext_mem_erase_page(p_uart_cmd->arg[0]);
+    p_uart_cmd->cmd_resp = memory_erase_page(p_uart_cmd->arg[0]);
 }
 
 void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd)
 {
-    ext_mem_erase_chip();
+    memory_erase_chip();
     p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
+}
+
+void cmd_sfs_read(uart_cmd_t *p_uart_cmd)
+{
+    sfs_file_info_t file_info;
+    /** Assign file name */
+    file_info.file_header.file_id = p_uart_cmd->arg[0];
+    p_uart_cmd->cmd_resp = sfs_read_file_info(&file_info);
+    if (p_uart_cmd->cmd_resp == 0)
+    {
+        p_uart_cmd->cmd_resp = sfs_read_file_data(&file_info, p_uart_cmd->payload, file_info.file_header.data_len);
+    }
+    p_uart_cmd->paylen = file_info.file_header.data_len;
+}
+
+void cmd_sfs_write(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->cmd_resp = sfs_write_file(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
 }

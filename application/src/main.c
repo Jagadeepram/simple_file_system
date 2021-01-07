@@ -49,10 +49,10 @@
 #include "uart_command.h"
 #include "led.h"
 #include "storage_mngr.h"
+#include "ext_mem_driver.h"
 
 int main(void)
 {
-
     lfclk_request();
     bsp_board_init(BSP_INIT_LEDS);
     APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
@@ -63,7 +63,6 @@ int main(void)
     uart_init();
 
     led_init();
-
     init_storage();
 
     NRF_LOG_FLUSH();

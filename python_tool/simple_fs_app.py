@@ -1,9 +1,3 @@
-# Copyright (c) 2020 Essity AB
-#
-# All rights are reserved.
-# Proprietary and confidential.
-# Unauthorized copying of this file, via any medium is strictly prohibited.
-# Any use is subject to an appropriate license granted by Essity AB
 
 import os
 import argparse
@@ -32,8 +26,9 @@ def main():
 
     menu_options = {
         'a': ['data_transfer_test', "Uart Protocol tester"],
-        'b': ['test_ext_mem_driver', "Test External Memory Driver"],
-        'c': ['external_memory_erase', "External Memory Erase"],
+        'b': ['external_memory_erase', "External Memory Erase"],
+        'c': ['file_test', "File Test"],
+        'e': ['GUI_app', "GUI Application"],
         '1': ['exit', "Exit"]
     }
 

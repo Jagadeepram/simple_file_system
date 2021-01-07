@@ -106,7 +106,7 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_CLK_PIN
-#define SPI_CLK_PIN 4
+#define SPI_CLK_PIN BSP_SPI_SCK_PIN
 #endif
 
 // <o> SPI_MISO_PIN  - Pin number
@@ -162,7 +162,7 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_MISO_PIN
-#define SPI_MISO_PIN 30
+#define SPI_MISO_PIN BSP_SPI_MISO_PIN
 #endif
 
 // <o> SPI_MOSI_PIN  - Pin number
@@ -218,7 +218,7 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_MOSI_PIN
-#define SPI_MOSI_PIN 28
+#define SPI_MOSI_PIN BSP_SPI_MOSI_PIN
 #endif
 
 // <o> SPI_SS_PIN  - Pin number
@@ -274,15 +274,15 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_nCS_PIN
-#define SPI_nCS_PIN 31
+#define SPI_nCS_PIN BSP_SPI_nCS_PIN
 #endif
 
 #ifndef SPI_nWP_PIN
-#define SPI_nWP_PIN 29
+#define SPI_nWP_PIN BSP_SPI_nWP_PIN
 #endif
 
 #ifndef SPI_nHOLD_PIN
-#define SPI_nHOLD_PIN 3
+#define SPI_nHOLD_PIN BSP_SPI_nHOLD_PIN
 #endif
 
 
@@ -663,7 +663,7 @@
 
 
 #ifndef NRFX_SPIM0_ENABLED
-#define NRFX_SPIM0_ENABLED 0
+#define NRFX_SPIM0_ENABLED 1
 #endif
 
 // <q> NRFX_SPIM1_ENABLED  - Enable SPIM1 instance
