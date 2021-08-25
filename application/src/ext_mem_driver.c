@@ -13,6 +13,9 @@
 #include "spi.h"
 #include "ext_mem_driver.h"
 
+#define MEM_ACCESS_READ  1
+#define MEM_ACCESS_WRITE 2
+
 /* A key that identify formated memory */
 #define MEM_INIT_KEY        (0xFEEDBABECAFEBEEF)
 
@@ -224,129 +227,105 @@ ret_code_t memory_erase(uint32_t address, uint32_t size)
     return err_code;
 }
 
+ret_code_t memory_access(uint8_t access_type, uint32_t address, uint8_t *data, uint32_t len)
+{
+	ret_code_t err_code = NRF_SUCCESS;
+	/* Allocate extra 4 bytes for command and address */
+	uint8_t data_bytes[MAX_PROGRAM_LEN + 4] = { 0 };
+	/* Allocate extra 4 bytes for command and address */
+	uint8_t dummy[MAX_PROGRAM_LEN + 4] = { 0 };
+	size_t data_len, total_len, remaining_len;
+
+	if (!data)
+	{
+	   return NRF_ERROR_INVALID_PARAM;
+	}
+
+	if ((address + len) > MEM_END_ADDRESS)
+	{
+	   /* Data size exceeds limit */
+	   return NRF_ERROR_DATA_SIZE;
+	}
+
+	total_len = 0;
+
+	/* Write data as a set of MAX_PROGRAM_LEN number of bytes in a single write command */
+	while ((total_len < len) && (err_code == NRF_SUCCESS))
+	{
+	   /* Copy data only till the end of the current page */
+	   data_len = MAX_PROGRAM_LEN - (address & MAX_PROG_LEN_MASK);
+	   remaining_len = len - total_len;
+
+	   if (remaining_len < data_len)
+	   {
+		   /* Data length is less than the available write length */
+		   data_len = remaining_len;
+	   }
+
+	   if (access_type == MEM_ACCESS_WRITE)
+	   {
+		   data_bytes[0] = PAGE_PROGRAM_CMD;
+	   }
+	   else
+	   {
+		   data_bytes[0] = READ_DATA_CMD;
+	   }
+	   data_bytes[1] = (address >> 16) & 0xFF;
+	   data_bytes[2] = (address >> 8) & 0xFF;
+	   data_bytes[3] = (address & 0xFF);
+
+	   if (access_type == MEM_ACCESS_WRITE)
+	   {
+		   memcpy(&data_bytes[4], data + total_len, data_len);
+	   }
+	   else
+	   {
+		   memset(&data_bytes[4], 0, data_len);
+	   }
+
+	   if (access_type == MEM_ACCESS_WRITE)
+	   {
+		   /* Always enable write before write/erase operation */
+		   err_code = write_enable();
+	   }
+
+	   if (err_code == NRF_SUCCESS)
+	   {
+		   err_code = spi_transfer(data_bytes, data_len + 4, dummy, data_len + 4);
+	   }
+
+	   if (err_code == NRF_SUCCESS)
+	   {
+		   if (access_type == MEM_ACCESS_WRITE)
+		   {
+			   /* Wait for write completion (LSB of status register to '0') */
+			   err_code = wait_write_complete();
+		   }
+		   else
+		   {
+		       /* Copy the read data to the output buffer */
+		       memcpy(data + total_len, dummy + 4, data_len);
+		   }
+	   }
+
+	   if (err_code == NRF_SUCCESS)
+	   {
+		   total_len += data_len;
+		   address += data_len;
+	   }
+	}
+
+	return err_code;
+}
+
 ret_code_t memory_write(uint32_t address, uint8_t *data, uint32_t len)
 {
-
-    ret_code_t err_code = NRF_SUCCESS;
-   /* Allocate extra 4 bytes for command and address */
-   uint8_t data_bytes[MAX_PROGRAM_LEN + 4] = { 0 };
-   /* Allocate extra 4 bytes for command and address */
-   uint8_t dummy[MAX_PROGRAM_LEN + 4] = { 0 };
-   size_t data_len, total_len, remaining_len;
-
-   if (!data)
-   {
-       return NRF_ERROR_INVALID_PARAM;
-   }
-
-   if ((address + len) > MEM_END_ADDRESS)
-   {
-       /* Data size exceeds limit */
-       return NRF_ERROR_DATA_SIZE;
-   }
-
-   total_len = 0;
-
-   /* Write data as a set of MAX_PROGRAM_LEN number of bytes in a single write command */
-   while ((total_len < len) && (err_code == NRF_SUCCESS))
-   {
-       /* Copy data only till the end of the current page */
-       data_len = MAX_PROGRAM_LEN - (address & MAX_PROG_LEN_MASK);
-       remaining_len = len - total_len;
-
-       if (remaining_len < data_len)
-       {
-           /* Data length is less than the available write length */
-           data_len = remaining_len;
-       }
-
-       data_bytes[0] = PAGE_PROGRAM_CMD;
-       data_bytes[1] = (address >> 16) & 0xFF;
-       data_bytes[2] = (address >> 8) & 0xFF;
-       data_bytes[3] = (address & 0xFF);
-
-       memcpy(&data_bytes[4], data + total_len, data_len);
-
-       /* Always enable write before write/erase operation */
-       err_code = write_enable();
-
-       if (err_code == NRF_SUCCESS)
-       {
-           err_code = spi_transfer(data_bytes, data_len + 4, dummy, data_len + 4);
-       }
-
-       /* Wait for write completion (LSB of status register to '0') */
-       if (err_code == NRF_SUCCESS)
-       {
-           err_code = wait_write_complete();
-       }
-
-       if (err_code == NRF_SUCCESS)
-       {
-           total_len += data_len;
-           address += data_len;
-       }
-   }
-
-    return err_code;
+    return memory_access(MEM_ACCESS_WRITE, address, data, len );
 }
 
 ret_code_t memory_read(uint32_t address, uint8_t *data, uint32_t len)
 {
-
-    ret_code_t err_code = NRF_SUCCESS;
-    size_t data_len, total_len, remaining_len;
-    /* Allocate extra 4 bytes for command and address */
-    uint8_t data_bytes[MAX_PROGRAM_LEN + 4] = { 0 };
-    /* Allocate extra 4 bytes for command and address */
-    uint8_t dummy[MAX_PROGRAM_LEN + 4] = { 0 };
-
-    if (!data)
-    {
-        return NRF_ERROR_INVALID_PARAM;
-    }
-
-    if ((address + len) > MEM_END_ADDRESS)
-    {
-        /* Data size exceeds limit */
-        return NRF_ERROR_DATA_SIZE;
-    }
-
-    total_len = 0;
-
-    /* Read data as a set of MAX_PROGRAM_LEN number of bytes in a single read command */
-    while ((total_len < len) && (err_code == NRF_SUCCESS))
-    {
-        /* Copy data only till the end of the current page */
-        data_len = MAX_PROGRAM_LEN - (address & MAX_PROG_LEN_MASK);
-        remaining_len = len - total_len;
-
-        if (remaining_len < data_len)
-        {
-            /* Data length is less than the available read length */
-            data_len = remaining_len;
-        }
-
-        data_bytes[0] = READ_DATA_CMD;
-        data_bytes[1] = (address >> 16) & 0xFF;
-        data_bytes[2] = (address >> 8) & 0xFF;
-        data_bytes[3] = (address & 0xFF);
-
-        memset(&data_bytes[4], 0, data_len);
-
-        err_code = spi_transfer(data_bytes, data_len + 4, dummy, data_len + 4);
-
-        /* Copy the read data to the output buffer */
-        memcpy(data + total_len, dummy + 4, data_len);
-
-        if (err_code == NRF_SUCCESS)
-        {
-            total_len += data_len;
-            address += data_len;
-        }
-    }
-
-    return err_code;
+    return memory_access(MEM_ACCESS_READ, address, data, len );
 }
 
 void memory_erase_chip(void)

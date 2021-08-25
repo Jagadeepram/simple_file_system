@@ -14,7 +14,8 @@ extern "C" {
 enum {
     CONFIG_FOLDER = 0,
     LOG_FOLDER,
-    DATA_FOLDER
+    DATA_FOLDER,
+    TOTAL_NBR_FOLDER
 };
 
 sfs_status_t init_storage(void);

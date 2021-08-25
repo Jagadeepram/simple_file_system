@@ -14,7 +14,7 @@
 #include "storage_mngr.h"
 
 static sfs_parameters_t sfs_parameters;
-static sfs_folder_info_t *sfs_folder_info;
+static sfs_folder_info_t sfs_folder_info[TOTAL_NBR_FOLDER];
 
 sfs_status_t init_storage(void)
 {
@@ -23,7 +23,7 @@ sfs_status_t init_storage(void)
     /** Function to write external memory */
     sfs_parameters.mem_write = memory_write;
     /** Function to read external memory */
-    sfs_parameters.mem_read = memory_read;;
+    sfs_parameters.mem_read = memory_read;
     /** Function to page erase external memory */
     sfs_parameters.mem_erase_page = memory_erase_page;
     /** Total size of the memory allocation */
@@ -35,7 +35,7 @@ sfs_status_t init_storage(void)
     /** Number of folders within the total allocation (sfs_properties.mem_len) */
     sfs_parameters.nbr_folders = 3;
     /** Create allocation for the folders and provide folder info */
-    sfs_folder_info = malloc(sfs_parameters.nbr_folders * sizeof(sfs_folder_info_t));
+    //sfs_folder_info = malloc(sfs_parameters.nbr_folders * sizeof(sfs_folder_info_t));
 
     sfs_folder_info[CONFIG_FOLDER].folder_len = MEM_SECTOR_SIZE;
     sfs_folder_info[CONFIG_FOLDER].start_address = MEM_START_ADDRESS + (MEM_PAGE_SIZE*10);
@@ -56,5 +56,5 @@ sfs_status_t init_storage(void)
 sfs_status_t uninit_storage(void)
 {
     free(sfs_folder_info);
-    return SFS_STATUS_NONE;
+    return SFS_STATUS_SUCCESS;
 }

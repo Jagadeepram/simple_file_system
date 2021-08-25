@@ -106,7 +106,8 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_CLK_PIN
-#define SPI_CLK_PIN BSP_SPI_SCK_PIN
+//#define SPI_CLK_PIN BSP_SPI_SCK_PIN
+#define SPI_CLK_PIN 4
 #endif
 
 // <o> SPI_MISO_PIN  - Pin number
@@ -162,7 +163,8 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_MISO_PIN
-#define SPI_MISO_PIN BSP_SPI_MISO_PIN
+//#define SPI_MISO_PIN BSP_SPI_MISO_PIN
+#define SPI_MISO_PIN 30
 #endif
 
 // <o> SPI_MOSI_PIN  - Pin number
@@ -218,7 +220,8 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_MOSI_PIN
-#define SPI_MOSI_PIN BSP_SPI_MOSI_PIN
+//define SPI_MOSI_PIN BSP_SPI_MOSI_PIN
+#define SPI_MOSI_PIN 28
 #endif
 
 // <o> SPI_SS_PIN  - Pin number
@@ -274,15 +277,18 @@
 // <4294967295=> Not connected
 
 #ifndef SPI_nCS_PIN
-#define SPI_nCS_PIN BSP_SPI_nCS_PIN
+//#define SPI_nCS_PIN BSP_SPI_nCS_PIN
+#define SPI_nCS_PIN 31
 #endif
 
 #ifndef SPI_nWP_PIN
-#define SPI_nWP_PIN BSP_SPI_nWP_PIN
+//#define SPI_nWP_PIN BSP_SPI_nWP_PIN
+#define SPI_nWP_PIN 29
 #endif
 
 #ifndef SPI_nHOLD_PIN
-#define SPI_nHOLD_PIN BSP_SPI_nHOLD_PIN
+//#define SPI_nHOLD_PIN BSP_SPI_nHOLD_PIN
+#define SPI_nHOLD_PIN 3
 #endif
 
 

@@ -71,7 +71,7 @@ typedef struct
   uint16_t cmd_resp;
   uint16_t nbr_arg;
   uint32_t arg[MAX_NBR_ARGU];
-  uint16_t paylen;
+  uint32_t paylen;
   uint8_t payload[MAX_PAYLOAD_LEN];
 } uart_cmd_t;
 

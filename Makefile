@@ -1,8 +1,5 @@
-# Makefile for onDosis project
+
 # This file is designed to execute on windows OS.
-# Pre-requisite:
-#	IAR compiler: Download it from IAR website
-#	Makefile software: K:\110613_OnDosis_Amber\Tools\SW\make_software\msysGit-netinstall-1.9.4-preview20140929
 
 # Compiler
 CC = arm-none-eabi-gcc
@@ -22,9 +19,10 @@ endif
 APP_DIR = application
 SDK_DIR = sdk
 BUILD_DIR ?= _build
+OBJ_DIR ?= $(BUILD_DIR)/obj
 
 # Binary file name
-TARGET_NAME ?= spi_gcc_nRF52
+TARGET_NAME ?= simple_file_system
 TARGET_OUT ?= $(TARGET_NAME).out
 TARGET_HEX ?= $(TARGET_NAME).hex
 TARGET_BIN ?= $(TARGET_NAME).bin
@@ -33,8 +31,8 @@ TARGET_BIN ?= $(TARGET_NAME).bin
 include sources.mk
 include flag_settings.mk
 
-OBJS := $(patsubst %.c,$(BUILD_DIR)/%.o,$(notdir $(C_SRC)))
-OBJS += $(patsubst %.S,$(BUILD_DIR)/%.o,$(notdir $(L_SRC)))
+OBJS := $(patsubst %.c,$(OBJ_DIR)/%.o,$(notdir $(C_SRC)))
+OBJS += $(patsubst %.S,$(OBJ_DIR)/%.o,$(notdir $(L_SRC)))
 
 DEPS := $(OBJS:.o=.d)
 INC_FLAGS := $(addprefix -I,$(INC))
@@ -48,13 +46,13 @@ $(BUILD_DIR)/$(TARGET_OUT): $(OBJS)
 	$(SIZE) $@
 
 # assembly
-$(BUILD_DIR)/%.o: %.S
+$(OBJ_DIR)/%.o: %.S
 	@mkdir -p $(dir $@)
 	@echo "Compiling $<";
 	$(NO_ECHO) $(CC) $(SFLAGS) -c $< -o $@
 
 # c source
-$(BUILD_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "Compiling $<";
 	$(NO_ECHO) $(CC) $(CFLAGS) $(INC_FLAGS) -c $< -o $@

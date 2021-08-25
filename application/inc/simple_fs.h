@@ -4,10 +4,12 @@
 
 #include "stdint.h"
 
+#define MOD_DIV(a,b) (((a)/(b))*(b))
 
 /*** Simple File System Status ***/
 typedef enum {
-    SFS_STATUS_NONE = 0,
+	SFS_STATUS_SUCCESS = 0,
+	SFS_STATUS_BLANK,
     SFS_STATUS_DRIVER_ERROR,
     SFS_STATUS_FILE_LEN_MISMATCH,
     SFS_STATUS_WRONG_FOLDER,
@@ -18,10 +20,11 @@ typedef enum {
     SFS_STATUS_READ_ERROR
 } sfs_status_t;
 
-typedef struct __attribute__((packed)){
+typedef struct __attribute__((packed))
+{
     uint8_t status;
     uint32_t file_id;
-    uint16_t data_len;
+    uint32_t data_len;
     uint16_t crc16;
 } sfs_file_header_t;
 

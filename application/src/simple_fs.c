@@ -40,38 +40,29 @@ typedef enum
 
 static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_info);
 static sfs_status_t sfs_search_page(uint32_t page_addr, sfs_search_type_t search, sfs_file_info_t *file_info);
+static sfs_status_t sfs_perform_gc(sfs_folder_info_t *folder_info, uint32_t *nbr_of_fresh_pages_after_gc);
 
-sfs_status_t sfs_init(sfs_parameters_t *sfs_parameters)
+
+static sfs_status_t sfs_perform_gc(sfs_folder_info_t *folder_info, uint32_t *nbr_of_fresh_pages_after_gc)
 {
-    uint8_t i;
-
-    sfs_param = sfs_parameters;
-
-    /** Initialize last written_address to zero */
-    for (i = 0; i < sfs_param->nbr_folders; i++)
-    {
-        sfs_param->sfs_folder_info[i].last_written_address = 0;
-    }
-    /* TODO: perform address check for data and garbage collection address */
-    return SFS_STATUS_NONE;
-}
-
-sfs_status_t sfs_uninit(void)
-{
-    return SFS_STATUS_NONE;
+    return SFS_STATUS_SUCCESS;
 }
 
 static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs_file_info_t *file_info)
 {
-    sfs_status_t status = SFS_STATUS_NONE;
+    sfs_status_t status = SFS_STATUS_BLANK;
     uint8_t page_state;
     sfs_file_header_t file_header;
     sfs_file_info_t last_file;
-    uint32_t end_addr = addr + PAGE_LEN;
+    uint32_t start_addr = MOD_DIV(addr, PAGE_LEN);
+    uint32_t end_addr = start_addr + PAGE_LEN;
+    /** Assign non zero value if the page contains an active file */
     uint8_t is_active_file = 0;
-    uint32_t start_addr = addr;
 
-    if (sfs_param->mem_read(addr++, &page_state, sizeof(page_state)) != 0)
+
+    /** Initialize last written address to zero */
+    last_file.address = 0;
+    if (sfs_param->mem_read(start_addr, &page_state, sizeof(page_state)) != 0)
     {
         return SFS_STATUS_DRIVER_ERROR;
     }
@@ -81,10 +72,16 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
         /** Do not search for new space in the old page */
         (search == SFS_SEARCH_FREE_SPACE && page_state == OLD_PAGE))
     {
-        return SFS_STATUS_NONE;
+        return SFS_STATUS_BLANK;
     }
 
-    do
+    if (start_addr == addr)
+    {
+        /** addr is equal to the start of the page, then increment by 1 */
+        addr++;
+    }
+
+    while (addr < end_addr)
     {
         if (sfs_param->mem_read(addr, (uint8_t*)&file_header, sizeof(file_header)) != 0)
         {
@@ -116,6 +113,7 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
                     }
                 }
                 file_info->address = addr;
+                return SFS_STATUS_SUCCESS;
             }
             else
             {
@@ -131,42 +129,43 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
                 {
                     return SFS_STATUS_DRIVER_ERROR;
                 }
+                return SFS_STATUS_BLANK;
             }
-            return SFS_STATUS_NONE;
         }
-
         /** Look for a particular file */
-        if ((search == SFS_SEARCH_FILE_ID) && (file_header.status == ACTIVE_FILE)
+        else if (search == SFS_SEARCH_FILE_ID)
+        {
+            if ((file_header.status == ACTIVE_FILE)
                 && (file_header.file_id == file_info->file_header.file_id))
-        {
-            file_info->file_header = file_header;
-            file_info->address = addr;
-            return SFS_STATUS_NONE;
+            {
+                file_info->file_header = file_header;
+                file_info->address = addr;
+                return SFS_STATUS_SUCCESS;
+            }
+            /** Look for a particular file */
+            else if (file_header.status == NEW_FILE)
+            {
+                return SFS_STATUS_FILE_NOT_FOUND;
+            }
         }
-
-        /** Look for a particular file */
-        if ((search == SFS_SEARCH_FILE_ID) && (file_header.status == NEW_FILE))
-        {
-            return SFS_STATUS_FILE_NOT_FOUND;
-        }
-
-        /** Look for the last file */
-        if ((search == SFS_SEARCH_LAST_FILE_ADDR) && (file_header.status == NEW_FILE))
+        /** Look for the last written file */
+        else if ((search == SFS_SEARCH_LAST_FILE_ADDR) && (file_header.status == NEW_FILE))
         {
             *file_info = last_file;
-            return SFS_STATUS_NONE;
+            return SFS_STATUS_SUCCESS;
         }
 
-        if ((file_header.status == ACTIVE_FILE) && (!is_active_file))
+        if (file_header.status == ACTIVE_FILE)
         {
-            is_active_file = 1;
+            if (!is_active_file)
+            {
+                is_active_file = 1;
+            }
+            last_file.file_header = file_header;
+            last_file.address = addr;
         }
-
-        last_file.file_header = file_header;
-        last_file.address = addr;
         addr += sizeof(sfs_file_header_t) + file_header.data_len;
-
-    } while (addr < end_addr);
+    }
 
     /** Declare a page as obsolete when it has no active file */
     if (is_active_file == 0)
@@ -178,6 +177,12 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
         }
     }
 
+    if (search == SFS_SEARCH_LAST_FILE_ADDR)
+    {
+        /** Assign last file info at the end of page search */
+        *file_info = last_file;
+    }
+
     return status;
 }
 
@@ -186,7 +191,9 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
     uint16_t folder_id = FOLDER(file_info->file_header.file_id) - 1;
     uint32_t addr;
     uint32_t end_addr;
-    sfs_status_t status = SFS_STATUS_NONE;
+    uint32_t last_written_address;
+    uint32_t nbr_of_fresh_pages_after_gc = 0;
+    sfs_status_t status = SFS_STATUS_BLANK;
 
     if (folder_id >= sfs_param->nbr_folders)
     {
@@ -196,23 +203,58 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
 
     addr = sfs_param->sfs_folder_info[folder_id].start_address;
     end_addr = addr + sfs_param->sfs_folder_info[folder_id].folder_len;
+    last_written_address = sfs_param->sfs_folder_info[folder_id].last_written_address;
     /** Set address to zero before the search */
     file_info->address = 0;
 
-    for (; addr < end_addr; addr += PAGE_LEN)
+    /** Update search address from last written file while finding new space */
+    if ((search == SFS_SEARCH_FREE_SPACE) && (last_written_address != 0))
     {
-        status = sfs_search_page(addr, search, file_info);
-        if ((file_info->address != 0) || (status != SFS_STATUS_NONE))
-        {
-            /** Search object found or error, end the loop */
-            return status;;
-        }
+        addr = last_written_address;
     }
 
-    if ((search == SFS_SEARCH_FREE_SPACE) && (status == SFS_STATUS_NONE))
+    for (; (addr < end_addr) && (status == SFS_STATUS_BLANK);)
     {
-        /** TODO: Trigger Garbage collection for SFS_STATUS_NO_SPACE */
-        /** TODO: Call the same function again to find new space after garbage collection */
+        status = sfs_search_page(addr, search, file_info);
+        addr = MOD_DIV((addr+PAGE_LEN), PAGE_LEN);
+    }
+
+    if (status == SFS_STATUS_BLANK)
+    {
+        if (file_info->address == 0)
+        {
+            if (search == SFS_SEARCH_FREE_SPACE)
+            {
+                /** Run garbage collection when unable to find free space */
+                status = sfs_perform_gc(&sfs_param->sfs_folder_info[folder_id], &nbr_of_fresh_pages_after_gc);
+                if (status == SFS_STATUS_SUCCESS)
+                {
+                    if (nbr_of_fresh_pages_after_gc > 0)
+                    {
+                        sfs_file_info_t temp_file_info = *file_info;
+                        /** Find last written space */
+                        sfs_search(SFS_SEARCH_LAST_FILE_ADDR, &temp_file_info);
+                        /** Find next available address to write */
+                        status = sfs_search(search, file_info);
+                    }
+                    else
+                    {
+                        /* return FS_STATUS_NO_SPACE if no fresh data pages are found after garbage collection */
+                        status = SFS_STATUS_NO_SPACE;
+                    }
+                }
+            }
+            else if (search == SFS_SEARCH_FILE_ID)
+            {
+                /** Assign file not found after going through all the pages */
+                status = SFS_STATUS_FILE_NOT_FOUND;
+            }
+        }
+        if (search == SFS_SEARCH_LAST_FILE_ADDR)
+        {
+            /** Store last written address into the folder info */
+            sfs_param->sfs_folder_info[folder_id].last_written_address = file_info->address;
+        }
     }
 
     return status;
@@ -223,6 +265,7 @@ sfs_status_t sfs_write_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
     sfs_status_t status;
     sfs_file_info_t file_info;
     uint32_t old_addr;
+    uint16_t folder_id = FOLDER(file_id) - 1;
 
     file_info.file_header.file_id = file_id;
     file_info.file_header.data_len = data_len;
@@ -232,10 +275,11 @@ sfs_status_t sfs_write_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
 
     /** Search for new space */
     status = sfs_search(SFS_SEARCH_FREE_SPACE, &file_info);
-    if (status == SFS_STATUS_NONE)
+    if (status == SFS_STATUS_SUCCESS)
     {
         file_info.file_header.status = ACTIVE_FILE;
         file_info.file_header.crc16 = crc16_compute(data, data_len, NULL);
+        sfs_param->sfs_folder_info[folder_id].last_written_address = file_info.address;
         /** Write the header */
         if (sfs_param->mem_write(file_info.address, (uint8_t *)&file_info.file_header, sizeof(sfs_file_header_t)) != 0)
         {
@@ -287,7 +331,7 @@ sfs_status_t sfs_read_file_data(sfs_file_info_t *file_info, uint8_t *data, uint3
         return SFS_STATUS_CRC_ERROR;
     }
 
-    return SFS_STATUS_NONE;
+    return SFS_STATUS_SUCCESS;
 }
 
 sfs_status_t sfs_read_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
@@ -301,15 +345,31 @@ sfs_status_t sfs_read_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
     /** Search for the file */
     status = sfs_search(SFS_SEARCH_FILE_ID, &file_info);
 
-    if (status == SFS_STATUS_NONE && file_info.address)
+    if (status == SFS_STATUS_SUCCESS)
     {
         status = sfs_read_file_data(&file_info, data, data_len);
-    }
-    else
-    {
-        status = SFS_STATUS_READ_ERROR;
     }
 
     return status;
 }
 
+sfs_status_t sfs_init(sfs_parameters_t *sfs_parameters)
+{
+    uint8_t i;
+
+    sfs_param = sfs_parameters;
+
+    /** Initialize last written_address to zero */
+    for (i = 0; i < sfs_param->nbr_folders; i++)
+    {
+        sfs_param->sfs_folder_info[i].last_written_address = 0;
+    }
+    /* TODO: Find the last written address for all folders */
+    /* TODO: perform address check for data and garbage collection address */
+    return SFS_STATUS_SUCCESS;
+}
+
+sfs_status_t sfs_uninit(void)
+{
+    return SFS_STATUS_SUCCESS;
+}
