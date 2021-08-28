@@ -16,7 +16,7 @@ extern "C" {
 #include "sdk_config.h"
 
 /* Memory size 1 Mbyte */
-#define MEMORY_SIZE         (0x800000)
+#define MEMORY_SIZE         (0x100000)
 #define MEM_START_ADDRESS   (0x000000)
 #define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
 
@@ -30,6 +30,14 @@ extern "C" {
  *
  */
 void ext_mem_init(void);
+
+/**@brief Erase
+ *
+ * @param[in]  uint32_t Address belongs to the page to be deleted
+ * @param[in]  size Number of bytes to delete. It should be multiple of 4096 (or 4K).
+ */
+
+ret_code_t memory_erase (uint32_t address, uint32_t size);
 
 /**@brief Erase page
  *

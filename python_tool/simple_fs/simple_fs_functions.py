@@ -134,19 +134,23 @@ class Simple_FS(object):
         print("Memory chip erased")
 
     def file_test(self):
-        for __ in range (10):
-            data = self.file_write()
+        for i in range (15):
+            file_id = 0x20001
+            file_len = 2000
+            data = self.file_write(file_id, file_len + i)
+            time.sleep(1)
 #             print(data)
-            read_data = self.file_read()
+            read_data = self.file_read(file_id)
+            time.sleep(1)
             if (data == read_data):
                 print("match")
             else:
                 print("mismatch")
 
-    def file_read(self):
+    def file_read(self, file_id):
         self.cmd_data.clear()
         self.cmd_data.cmd = Command.COMMAND_SFS_READ
-        self.cmd_data.arg = [0x10001]
+        self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
         read_cmd = self.transport.read_response(msg_id=msg_id)
         temp = read_cmd.payload
@@ -156,11 +160,11 @@ class Simple_FS(object):
 
         return read_cmd.payload
 
-    def file_write(self):
+    def file_write(self, file_id, file_len):
         self.cmd_data.clear()
         self.cmd_data.cmd = Command.COMMAND_SFS_WRITE
-        self.cmd_data.payload = [(random.randint(65, 90)) for __ in range (1000)]
-        self.cmd_data.arg = [0x10001]
+        self.cmd_data.payload = [(random.randint(65, 90)) for __ in range (file_len)]
+        self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
         self.transport.read_response(msg_id=msg_id)
         return self.cmd_data.payload

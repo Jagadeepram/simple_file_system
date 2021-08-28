@@ -429,6 +429,7 @@ void cmd_ext_mem_page_erase(uart_cmd_t *p_uart_cmd)
 void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd)
 {
     memory_erase_chip();
+    sfs_uninit();
     p_uart_cmd->cmd_resp = UART_RESP_NO_ERROR;
 }
 

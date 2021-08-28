@@ -10,22 +10,33 @@
 #include "simple_fs.h"
 #include "crc16.h"
 
-#define PAGE_LEN (4096)
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+#include "nrf_log_default_backends.h"
+
 #define FOLDER(FILE_ID)  ((FILE_ID)>>16)
 
 /** Page status */
+/** A fresh page where no data exits */
 #define NEW_PAGE       (0xFF)
+/** A page where active data and some free space exits*/
 #define ACTIVE_PAGE    (0x7F)
+/** A page where at least one active data and no free space exits*/
 #define OLD_PAGE       (0x07)
-#define END_PAGE       (0x03)
+/** A page where no active data and no free space exits*/
 #define OBSOLETE_PAGE  (0x00)
 
 /** File status */
+/** A space is available for new file */
 #define NEW_FILE       (0xFF)
+/** An active file is found */
 #define ACTIVE_FILE    (0x0F)
+/** End of page, no more data exits beyond this address in a page */
+#define END_PAGE       (0x03)
+/** An invalidated file is found */
 #define OLD_FILE       (0x00)
 
-static sfs_parameters_t * sfs_param;
+static sfs_parameters_t *sfs_param;
 
 typedef enum
 {
@@ -38,52 +49,341 @@ typedef enum
     SFS_SEARCH_FILE_ID,
 } sfs_search_type_t;
 
-static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_info);
-static sfs_status_t sfs_search_page(uint32_t page_addr, sfs_search_type_t search, sfs_file_info_t *file_info);
-static sfs_status_t sfs_perform_gc(sfs_folder_info_t *folder_info, uint32_t *nbr_of_fresh_pages_after_gc);
+static sfs_status_t sfs_search (sfs_search_type_t search, sfs_file_info_t *file_info);
+static sfs_status_t sfs_search_page (uint32_t addr, uint32_t start_addr, sfs_search_type_t search, sfs_file_info_t *file_info, uint32_t page_len);
+static sfs_status_t sfs_perform_gc (sfs_file_info_t *file_info, uint32_t *nbr_of_fresh_pages_after_gc);
+static sfs_status_t sfs_move_active_files_to_gc_pages (uint32_t *address, uint32_t folder_start_address, uint32_t folder_end_address,
+                                                       uint32_t page_size, uint32_t gc_start_address, uint32_t gc_size);
+static sfs_status_t sfs_copy_data (uint32_t source_address, uint32_t dest_address, uint32_t data_len);
+static sfs_status_t sfs_update_data_pages (uint32_t folder_start_address, uint32_t folder_end_address, uint32_t page_size, uint32_t gc_start_address,
+                                           uint32_t gc_size);
 
-
-static sfs_status_t sfs_perform_gc(sfs_folder_info_t *folder_info, uint32_t *nbr_of_fresh_pages_after_gc)
+static sfs_status_t sfs_copy_data (uint32_t source_address, uint32_t dest_address, uint32_t data_len)
 {
+    uint8_t data[DATA_TRANSFER_SIZE];
+    uint32_t len;
+
+    while (data_len > 0)
+    {
+        if (data_len >= DATA_TRANSFER_SIZE)
+        {
+            len = DATA_TRANSFER_SIZE;
+        }
+        else
+        {
+            len = data_len;
+        }
+
+        if (sfs_param->mem_read(source_address, data, len) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        if (sfs_param->mem_write(dest_address, data, len) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        source_address += len;
+        dest_address += len;
+        data_len -= len;
+    }
     return SFS_STATUS_SUCCESS;
 }
 
-static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs_file_info_t *file_info)
+static sfs_status_t sfs_move_active_files_to_gc_pages (uint32_t *address, uint32_t folder_start_address, uint32_t folder_end_address,
+                                                       uint32_t page_size, uint32_t gc_address, uint32_t gc_size)
+{
+    uint32_t page_start_address;
+    uint32_t gc_start_address = gc_address;
+    uint32_t gc_end_address = gc_address + gc_size;
+    sfs_status_t status = SFS_STATUS_BLANK;
+    uint8_t page_state;
+    sfs_file_header_t file_header;
+
+    /** Erase GC pages */
+    if (sfs_param->mem_erase(gc_address, SFS_SMALL(gc_size, page_size)) != 0)
+    {
+        return SFS_STATUS_DRIVER_ERROR;
+    }
+
+    /** Copy active files to erased GC pages */
+    /** Iterate through all folder pages */
+    while ((*address < folder_end_address) && (gc_address < gc_end_address) && (status == SFS_STATUS_BLANK))
+    {
+        *address = PAGE_START_ADDR((*address), folder_start_address, page_size);
+        page_start_address = *address;
+
+        /** Read the page status */
+        if (sfs_param->mem_read(*address, &page_state, sizeof(page_state)) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        if (page_state == OBSOLETE_PAGE)
+        {
+            *address += page_size;
+            continue;
+        }
+        else if (page_state == NEW_PAGE)
+        {
+            /** All active files are collected */
+            status = SFS_STATUS_SUCCESS;
+        }
+
+        *address += sizeof(page_state);
+        /** Iterate through all files in a folder page */
+        while (*address < (page_start_address + page_size) && (gc_address < gc_end_address) && (status == SFS_STATUS_BLANK))
+        {
+            if (sfs_param->mem_read(*address, (uint8_t*) &file_header, sizeof(file_header)) != 0)
+            {
+                return SFS_STATUS_DRIVER_ERROR;
+            }
+
+            if (file_header.status == OLD_FILE)
+            {
+                *address += (sizeof(file_header) + file_header.data_len);
+            }
+            else if (file_header.status == END_PAGE || file_header.status == NEW_FILE)
+            {
+                /** Make the current page as obsolete as reaching end of page */
+                /** The update should be done at the starting address of this page */
+                page_state = OBSOLETE_PAGE;
+                *address = PAGE_START_ADDR((*address), folder_start_address, page_size);
+                //*address = MOD_DIV((*address), page_size);
+                if (sfs_param->mem_write(*address, &page_state, sizeof(page_state)) != 0)
+                {
+                    return SFS_STATUS_DRIVER_ERROR;
+                }
+                /** Update address to the next page */
+                *address += page_size;
+
+                if (file_header.status == NEW_FILE)
+                {
+                    /** All active files are collected */
+                    status = SFS_STATUS_SUCCESS;
+                    break;
+                }
+            }
+            else if (file_header.status == ACTIVE_FILE)
+            {
+                uint32_t next_gc_address = (gc_address + sizeof(file_header) + file_header.data_len);
+                /** Check if the active file fits into the current garbage page */
+                if (PAGE_START_ADDR(next_gc_address, gc_start_address, page_size) == PAGE_START_ADDR(gc_address, gc_start_address, page_size))
+                {
+                    /** The current active file fits into the garbage page, so copy it to the garbage page */
+                    /** Update the page as active */
+                    if (PAGE_START_ADDR(gc_address, gc_start_address, page_size) == gc_address)
+                    {
+                        page_state = ACTIVE_PAGE;
+                        if (sfs_param->mem_write(gc_address, &page_state, sizeof(page_state)) != 0)
+                        {
+                            return SFS_STATUS_DRIVER_ERROR;
+                        }
+                        gc_address += sizeof(page_state);
+                    }
+                    /** Copy the active file to garbage collection page */
+                    if (sfs_copy_data(*address, gc_address, (sizeof(file_header) + file_header.data_len)) != SFS_STATUS_SUCCESS)
+                    {
+                        return SFS_STATUS_DRIVER_ERROR;
+                    }
+                    /** Update the status as OLD file */
+                    file_header.status = OLD_FILE;
+                    if (sfs_param->mem_write(*address, (uint8_t*) &file_header.status, sizeof(file_header.status)) != 0)
+                    {
+                        return SFS_STATUS_DRIVER_ERROR;
+                    }
+                    gc_address += (sizeof(file_header) + file_header.data_len);
+                    *address += (sizeof(file_header) + file_header.data_len);
+                }
+                else
+                {
+                    /** Data crossing a GC page */
+                    /** Mark it as end of the page and copy this file starting from the next page */
+                    file_header.status = END_PAGE;
+                    if (sfs_param->mem_write(gc_address, (uint8_t*) &file_header.status, sizeof(file_header.status)) != 0)
+                    {
+                        return SFS_STATUS_DRIVER_ERROR;
+                    }
+                    /** Go to the beginning of the page and mark it as old */
+                    gc_address = PAGE_START_ADDR(gc_address, gc_start_address, page_size);
+                    page_state = OLD_PAGE;
+                    if (sfs_param->mem_write(gc_address, &page_state, sizeof(page_state)) != 0)
+                    {
+                        return SFS_STATUS_DRIVER_ERROR;
+                    }
+                    gc_address += page_size;
+                }
+            }
+            else
+            {
+                /** Should not reach here */
+                status = SFS_STATUS_GARBAGE_ERROR;
+                break;
+            }
+        }
+    }
+
+    return status;
+}
+
+static sfs_status_t sfs_update_data_pages (uint32_t folder_start_address, uint32_t folder_end_address, uint32_t page_size, uint32_t gc_start_address,
+                                           uint32_t gc_size)
+{
+    uint32_t gc_end_address = gc_start_address + gc_size;
+    uint8_t gc_page_state, data_page_state;
+    sfs_status_t status;
+
+    while ((gc_start_address < gc_end_address) && (folder_start_address < folder_end_address))
+    {
+        /** Read the data page status */
+        if (sfs_param->mem_read(folder_start_address, &data_page_state, sizeof(data_page_state)) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        if (data_page_state != OBSOLETE_PAGE)
+        {
+            /** Move to the next page if not obsolete*/
+            folder_start_address += page_size;
+            continue;
+        }
+
+        /** Erase the data page which is obsolete */
+        if (sfs_param->mem_erase(folder_start_address, page_size) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        /** Read the GC page status */
+        if (sfs_param->mem_read(gc_start_address, &gc_page_state, sizeof(gc_page_state)) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+
+        if ((gc_page_state == OLD_PAGE) || (gc_page_state == ACTIVE_PAGE))
+        {
+            /** Copy contents of GC page to the data page */
+            status = sfs_copy_data(gc_start_address, folder_start_address, page_size);
+            if (status != SFS_STATUS_SUCCESS)
+            {
+                return SFS_STATUS_DRIVER_ERROR;
+            }
+
+            folder_start_address += page_size;
+            gc_start_address += page_size;
+        }
+    }
+    return status;
+}
+
+static sfs_status_t sfs_find_nbr_of_free_pages (uint32_t start_address, uint32_t end_address, uint32_t page_size, uint32_t *nbr_pages)
+{
+    uint8_t page_state;
+    *nbr_pages = 0;
+
+    while (start_address < end_address)
+    {
+        if (sfs_param->mem_read(start_address, &page_state, sizeof(page_state)) != 0)
+        {
+            return SFS_STATUS_DRIVER_ERROR;
+        }
+        if ((page_state == NEW_PAGE) || (page_state == ACTIVE_PAGE))
+        {
+            *nbr_pages += 1;
+        }
+        start_address += page_size;
+    }
+
+    return SFS_STATUS_SUCCESS;
+}
+
+static sfs_status_t sfs_perform_gc (sfs_file_info_t *file_info, uint32_t *nbr_of_fresh_pages_after_gc)
+{
+    uint16_t folder_id = FOLDER(file_info->file_header.file_id) - 1;
+
+    uint32_t folder_start_address = sfs_param->sfs_folder_info[folder_id].start_address;
+    uint32_t folder_end_address = folder_start_address + sfs_param->sfs_folder_info[folder_id].folder_len;
+    uint32_t folder_page_size = sfs_param->sfs_folder_info[folder_id].page_len;
+
+    uint32_t address = folder_start_address;
+    sfs_status_t gc_status;
+    sfs_status_t status;
+
+    while (address < folder_end_address)
+    {
+        /** Copy active files from folders to GC pages */
+        gc_status = sfs_move_active_files_to_gc_pages(&address, folder_start_address, folder_end_address, folder_page_size, sfs_param->gc_address,
+                                                      sfs_param->gc_len);
+
+        if ((gc_status == SFS_STATUS_SUCCESS) || (gc_status == SFS_STATUS_BLANK))
+        {
+            status = sfs_update_data_pages(folder_start_address, folder_end_address, folder_page_size, sfs_param->gc_address, sfs_param->gc_len);
+        }
+        else
+        {
+            /** Something went wrong, end the garbage collection */
+            status = gc_status;
+            break;
+        }
+
+        if ((gc_status == SFS_STATUS_SUCCESS) || (address >= folder_end_address))
+        {
+            /** Find last written space */
+            status = sfs_search(SFS_SEARCH_LAST_FILE_ADDR, file_info);
+            if (status == SFS_STATUS_SUCCESS)
+            {
+                sfs_param->sfs_folder_info[folder_id].last_written_address = file_info->address;
+                /** Calculate the number of blank pages available */
+                status = sfs_find_nbr_of_free_pages(folder_start_address, folder_end_address, folder_page_size, nbr_of_fresh_pages_after_gc);
+            }
+            break;
+        }
+    }
+
+    return status;
+}
+
+static sfs_status_t sfs_search_page (uint32_t addr, uint32_t start_addr, sfs_search_type_t search, sfs_file_info_t *file_info, uint32_t page_len)
 {
     sfs_status_t status = SFS_STATUS_BLANK;
     uint8_t page_state;
     sfs_file_header_t file_header;
     sfs_file_info_t last_file;
-    uint32_t start_addr = MOD_DIV(addr, PAGE_LEN);
-    uint32_t end_addr = start_addr + PAGE_LEN;
+    uint32_t end_addr;
     /** Assign non zero value if the page contains an active file */
     uint8_t is_active_file = 0;
 
-
     /** Initialize last written address to zero */
     last_file.address = 0;
+    /** Find the start address of the page */
+    start_addr = PAGE_START_ADDR(addr, start_addr, page_len);
+    /** Find the end address of the page */
+    end_addr = start_addr + page_len;
+    /** Read the page status */
     if (sfs_param->mem_read(start_addr, &page_state, sizeof(page_state)) != 0)
     {
         return SFS_STATUS_DRIVER_ERROR;
     }
 
     /** Do not process the obsolete page */
-    if ((page_state == OBSOLETE_PAGE) ||
-        /** Do not search for new space in the old page */
-        (search == SFS_SEARCH_FREE_SPACE && page_state == OLD_PAGE))
+    /** Do not search for new space in the old page */
+    if ((page_state == OBSOLETE_PAGE) || (search == SFS_SEARCH_FREE_SPACE && page_state == OLD_PAGE))
     {
         return SFS_STATUS_BLANK;
     }
 
     if (start_addr == addr)
     {
-        /** addr is equal to the start of the page, then increment by 1 */
+        /** addr is equal to the start of the page, then increment by 1.
+         * Sometimes the addr is taken from the last written address and it
+         * should not be incremented in that case.*/
         addr++;
     }
 
     while (addr < end_addr)
     {
-        if (sfs_param->mem_read(addr, (uint8_t*)&file_header, sizeof(file_header)) != 0)
+        if (sfs_param->mem_read(addr, (uint8_t*) &file_header, sizeof(file_header)) != 0)
         {
             return SFS_STATUS_DRIVER_ERROR;
         }
@@ -135,8 +435,7 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
         /** Look for a particular file */
         else if (search == SFS_SEARCH_FILE_ID)
         {
-            if ((file_header.status == ACTIVE_FILE)
-                && (file_header.file_id == file_info->file_header.file_id))
+            if ((file_header.status == ACTIVE_FILE) && (file_header.file_id == file_info->file_header.file_id))
             {
                 file_info->file_header = file_header;
                 file_info->address = addr;
@@ -179,20 +478,21 @@ static sfs_status_t sfs_search_page(uint32_t addr, sfs_search_type_t search, sfs
 
     if (search == SFS_SEARCH_LAST_FILE_ADDR)
     {
-        /** Assign last file info at the end of page search */
+        /** Assign the last file info at the end of page search */
         *file_info = last_file;
     }
 
     return status;
 }
 
-static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_info)
+static sfs_status_t sfs_search (sfs_search_type_t search, sfs_file_info_t *file_info)
 {
     uint16_t folder_id = FOLDER(file_info->file_header.file_id) - 1;
-    uint32_t addr;
+    uint32_t addr, start_addr;
     uint32_t end_addr;
     uint32_t last_written_address;
     uint32_t nbr_of_fresh_pages_after_gc = 0;
+    uint32_t page_len;
     sfs_status_t status = SFS_STATUS_BLANK;
 
     if (folder_id >= sfs_param->nbr_folders)
@@ -204,8 +504,10 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
     addr = sfs_param->sfs_folder_info[folder_id].start_address;
     end_addr = addr + sfs_param->sfs_folder_info[folder_id].folder_len;
     last_written_address = sfs_param->sfs_folder_info[folder_id].last_written_address;
+    page_len = sfs_param->sfs_folder_info[folder_id].page_len;
     /** Set address to zero before the search */
     file_info->address = 0;
+    start_addr = addr;
 
     /** Update search address from last written file while finding new space */
     if ((search == SFS_SEARCH_FREE_SPACE) && (last_written_address != 0))
@@ -215,8 +517,11 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
 
     for (; (addr < end_addr) && (status == SFS_STATUS_BLANK);)
     {
-        status = sfs_search_page(addr, search, file_info);
-        addr = MOD_DIV((addr+PAGE_LEN), PAGE_LEN);
+        status = sfs_search_page(addr, start_addr, search, file_info, page_len);
+        /** Assign start address of a page */
+        addr = PAGE_START_ADDR(addr, start_addr, page_len);
+        addr += page_len;
+        //addr = MOD_DIV((addr + page_len), page_len);
     }
 
     if (status == SFS_STATUS_BLANK)
@@ -226,14 +531,11 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
             if (search == SFS_SEARCH_FREE_SPACE)
             {
                 /** Run garbage collection when unable to find free space */
-                status = sfs_perform_gc(&sfs_param->sfs_folder_info[folder_id], &nbr_of_fresh_pages_after_gc);
+                status = sfs_perform_gc(file_info, &nbr_of_fresh_pages_after_gc);
                 if (status == SFS_STATUS_SUCCESS)
                 {
                     if (nbr_of_fresh_pages_after_gc > 0)
                     {
-                        sfs_file_info_t temp_file_info = *file_info;
-                        /** Find last written space */
-                        sfs_search(SFS_SEARCH_LAST_FILE_ADDR, &temp_file_info);
                         /** Find next available address to write */
                         status = sfs_search(search, file_info);
                     }
@@ -253,67 +555,73 @@ static sfs_status_t sfs_search(sfs_search_type_t search, sfs_file_info_t *file_i
         if (search == SFS_SEARCH_LAST_FILE_ADDR)
         {
             /** Store last written address into the folder info */
-            sfs_param->sfs_folder_info[folder_id].last_written_address = file_info->address;
+            status = SFS_STATUS_SUCCESS;
         }
     }
 
     return status;
 }
 
-sfs_status_t sfs_write_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
+sfs_status_t sfs_write_file (uint32_t file_id, uint8_t *data, uint32_t data_len)
 {
     sfs_status_t status;
-    sfs_file_info_t file_info;
-    uint32_t old_addr;
+    sfs_file_info_t new_file_info;
+    sfs_file_info_t old_file_info;
     uint16_t folder_id = FOLDER(file_id) - 1;
 
-    file_info.file_header.file_id = file_id;
-    file_info.file_header.data_len = data_len;
+    new_file_info.file_header.file_id = file_id;
+    new_file_info.file_header.data_len = data_len;
+    old_file_info.file_header.file_id = file_id;
+    old_file_info.address = 0;
+    /** Search for new space and perform GC if needed*/
+    status = sfs_search(SFS_SEARCH_FREE_SPACE, &new_file_info);
     /** Search for an existing file */
-    status = sfs_search(SFS_SEARCH_FILE_ID, &file_info);
-    old_addr = file_info.address;
-
-    /** Search for new space */
-    status = sfs_search(SFS_SEARCH_FREE_SPACE, &file_info);
+    sfs_search(SFS_SEARCH_FILE_ID, &old_file_info);
     if (status == SFS_STATUS_SUCCESS)
     {
-        file_info.file_header.status = ACTIVE_FILE;
-        file_info.file_header.crc16 = crc16_compute(data, data_len, NULL);
-        sfs_param->sfs_folder_info[folder_id].last_written_address = file_info.address;
+        new_file_info.file_header.status = ACTIVE_FILE;
+        new_file_info.file_header.data_len = data_len;
+        new_file_info.file_header.crc16 = crc16_compute(data, data_len, NULL);
+        sfs_param->sfs_folder_info[folder_id].last_written_address = new_file_info.address;
+        NRF_LOG_INFO("Data written at %x, len: %d", new_file_info.address, data_len);
         /** Write the header */
-        if (sfs_param->mem_write(file_info.address, (uint8_t *)&file_info.file_header, sizeof(sfs_file_header_t)) != 0)
+        if (sfs_param->mem_write(new_file_info.address, (uint8_t*) &new_file_info.file_header, sizeof(sfs_file_header_t)) != 0)
         {
             return SFS_STATUS_DRIVER_ERROR;
         }
         /** Write the data */
-        file_info.address += sizeof(sfs_file_header_t);
-        if (sfs_param->mem_write(file_info.address, data, data_len) != 0)
+        new_file_info.address += sizeof(sfs_file_header_t);
+        if (sfs_param->mem_write(new_file_info.address, data, data_len) != 0)
         {
             return SFS_STATUS_DRIVER_ERROR;
         }
     }
 
     /** Inactivate the old file */
-    if (old_addr)
+    if (old_file_info.address)
     {
-        file_info.file_header.status = OLD_FILE;
+        old_file_info.file_header.status = OLD_FILE;
+        NRF_LOG_INFO("Data invalidated at %x, len: %d", old_file_info.address, old_file_info.file_header.data_len);
         /** Write the header */
-        if (sfs_param->mem_write(old_addr, (uint8_t *)&file_info.file_header.status, sizeof(file_info.file_header.status)) != 0)
+        if (sfs_param->mem_write(old_file_info.address, (uint8_t*) &old_file_info.file_header.status, sizeof(old_file_info.file_header.status)) != 0)
         {
             return SFS_STATUS_DRIVER_ERROR;
         }
     }
-
+    NRF_LOG_FLUSH();
     return status;
 }
 
-sfs_status_t sfs_read_file_info(sfs_file_info_t *file_info)
+sfs_status_t sfs_read_file_info (sfs_file_info_t *file_info)
 {
     return sfs_search(SFS_SEARCH_FILE_ID, file_info);;
 }
 
-sfs_status_t sfs_read_file_data(sfs_file_info_t *file_info, uint8_t *data, uint32_t data_len)
+sfs_status_t sfs_read_file_data (sfs_file_info_t *file_info, uint8_t *data, uint32_t data_len)
 {
+    NRF_LOG_INFO("Read from %x, len: %d", file_info->address, data_len);
+    NRF_LOG_FLUSH();
+
     file_info->address += sizeof(sfs_file_header_t);
 
     if (data_len != file_info->file_header.data_len)
@@ -334,7 +642,7 @@ sfs_status_t sfs_read_file_data(sfs_file_info_t *file_info, uint8_t *data, uint3
     return SFS_STATUS_SUCCESS;
 }
 
-sfs_status_t sfs_read_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
+sfs_status_t sfs_read_file (uint32_t file_id, uint8_t *data, uint32_t data_len)
 {
     sfs_status_t status;
     sfs_file_info_t file_info;
@@ -353,23 +661,39 @@ sfs_status_t sfs_read_file(uint32_t file_id, uint8_t *data, uint32_t data_len)
     return status;
 }
 
-sfs_status_t sfs_init(sfs_parameters_t *sfs_parameters)
+sfs_status_t sfs_init (sfs_parameters_t *sfs_parameters)
 {
     uint8_t i;
+    sfs_status_t status = SFS_STATUS_SUCCESS;
+    sfs_file_info_t file_info;
 
     sfs_param = sfs_parameters;
 
+    /** Initialize last written_address */
+    for (i = 0; (i < sfs_param->nbr_folders) && (status == SFS_STATUS_SUCCESS); i++)
+    {
+        file_info.file_header.file_id = FILE_ID((i + 1), 0);
+        status = sfs_search(SFS_SEARCH_LAST_FILE_ADDR, &file_info);
+        sfs_param->sfs_folder_info[i].last_written_address = file_info.address;
+
+        if (sfs_param->sfs_folder_info[i].start_address%ADDRESS_ALIGNMENT != 0)
+        {
+            NRF_LOG_INFO("Address 0x%x not aligned with %x", sfs_param->sfs_folder_info[i].start_address, ADDRESS_ALIGNMENT);
+            return SFS_STATUS_ADDRESS_ALIGNMENT_ERROR;
+        }
+    }
+    /* TODO: perform address check for data and garbage collection address */
+    return status;
+}
+
+sfs_status_t sfs_uninit (void)
+{
+    uint8_t i;
+
     /** Initialize last written_address to zero */
-    for (i = 0; i < sfs_param->nbr_folders; i++)
+    for (i = 0; (i < sfs_param->nbr_folders); i++)
     {
         sfs_param->sfs_folder_info[i].last_written_address = 0;
     }
-    /* TODO: Find the last written address for all folders */
-    /* TODO: perform address check for data and garbage collection address */
-    return SFS_STATUS_SUCCESS;
-}
-
-sfs_status_t sfs_uninit(void)
-{
     return SFS_STATUS_SUCCESS;
 }

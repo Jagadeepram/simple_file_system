@@ -4,12 +4,32 @@
 
 #include "stdint.h"
 
-#define MOD_DIV(a,b) (((a)/(b))*(b))
+#define ADDRESS_BIT_MASK          (0x0FFFF)
+#define FILE_ID_MASK              (0xFFFFF)
+#define ADDRESS_ALIGNMENT         (0x1000)
+
+//#define MOD_DIV(a, b) (((a)/(b))*(b))
+
+#define ABS_DIFF(a, b) ((a) < (b)? ((b)-(a)):((a)-(b)))
+/** Find starting address of a page
+ *     a: address of file
+ *     b: starting address of the folder
+ *     c: page size of the folder
+ */
+#define PAGE_START_ADDR(a, b, c) (((((a)-(b))/(c))*(c))+(b))
+
+/** Convert to a FILE ID from a given folder and file name */
+#define FILE_ID(folder, file) (((folder) << 16) | ((file) & ADDRESS_BIT_MASK))
+
+#define SFS_SMALL(a, b) ((a)<(b) ? (a):(b))
+
+/** Set the length for data buffer for internal transfer */
+#define DATA_TRANSFER_SIZE 4096
 
 /*** Simple File System Status ***/
 typedef enum {
-	SFS_STATUS_SUCCESS = 0,
-	SFS_STATUS_BLANK,
+    SFS_STATUS_SUCCESS = 0,
+    SFS_STATUS_BLANK,
     SFS_STATUS_DRIVER_ERROR,
     SFS_STATUS_FILE_LEN_MISMATCH,
     SFS_STATUS_WRONG_FOLDER,
@@ -17,7 +37,9 @@ typedef enum {
     SFS_STATUS_WARE_OUT,
     SFS_STATUS_NO_SPACE,
     SFS_STATUS_CRC_ERROR,
-    SFS_STATUS_READ_ERROR
+    SFS_STATUS_READ_ERROR,
+    SFS_STATUS_GARBAGE_ERROR,
+    SFS_STATUS_ADDRESS_ALIGNMENT_ERROR
 } sfs_status_t;
 
 typedef struct __attribute__((packed))
@@ -34,19 +56,27 @@ typedef struct {
 } sfs_file_info_t;
 
 typedef struct {
+    /** The start address must be 4096 aligned */
     uint32_t start_address;
+    /** Folder length should always be multiple of page_len */
     uint32_t folder_len;
     uint32_t last_written_address;
+    /** This value should be
+     *          Greater than largest file the folder shall contain
+     *          Multiple of 4096 (or 4K)
+     *          Less than or equal to folder_len
+     */
+    uint32_t page_len;
 } sfs_folder_info_t;
 
 typedef uint32_t (*mem_write_t)(uint32_t, uint8_t *,uint32_t);
 typedef uint32_t (*mem_read_t)(uint32_t, uint8_t *,uint32_t);
-typedef uint32_t (*mem_erase_page_t)(uint32_t);
+typedef uint32_t (*mem_erase_t)(uint32_t , uint32_t);
 
 typedef struct {
     mem_write_t mem_write;
     mem_read_t mem_read;
-    mem_erase_page_t mem_erase_page;
+    mem_erase_t mem_erase;
     uint32_t mem_len;
     uint32_t gc_len;
     uint32_t gc_address;
