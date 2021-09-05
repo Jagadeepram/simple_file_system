@@ -76,20 +76,25 @@ typedef struct
 } uart_cmd_t;
 
 /** Command to test UART protocol */
-#define COMMAND_UART_TEST             0x0001
+#define COMMAND_UART_TEST               0x0001
 /** Command to write raw data into ext mem */
-#define COMMAND_EXT_MEM_WRITE         0x0010
+#define COMMAND_EXT_MEM_WRITE           0x0010
 /** Command to read raw data into ext mem */
-#define COMMAND_EXT_MEM_READ          0x0011
+#define COMMAND_EXT_MEM_READ            0x0011
 /** Command to perform page erase */
-#define COMMAND_EXT_MEM_PAGE_ERASE    0x0012
+#define COMMAND_EXT_MEM_PAGE_ERASE      0x0012
 /** Command to perform chip erase */
-#define COMMAND_EXT_MEM_CHIP_ERASE    0x0013
+#define COMMAND_EXT_MEM_CHIP_ERASE      0x0013
 
 /** Simple File system commands */
 #define COMMAND_SFS_READ             0x0100
 #define COMMAND_SFS_WRITE            0x0101
-
+/** Command to write file in parts */
+#define COMMAND_SFS_READ_IN_PARTS    0x0102
+/** Command to read file in parts */
+#define COMMAND_SFS_WRITE_IN_PARTS   0x0103
+/** Command to read last written file */
+#define COMMAND_SFS_LAST_WRITTEN   0x0104
 
 /**@brief Function for writing the atomic FIFO to UART. */
 void atfifo_to_uart(void);

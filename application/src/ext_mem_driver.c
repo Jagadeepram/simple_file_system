@@ -46,7 +46,7 @@
 /* Starting address of the external memory */
 #define EXT_MEM_START_ADDRESS 0x0
 
-static ret_code_t spi_transfer (uint8_t *tx_buff, size_t tx_len, uint8_t *rx_buff, size_t rx_len)
+static ret_code_t spi_transfer(uint8_t *tx_buff, size_t tx_len, uint8_t *rx_buff, size_t rx_len)
 {
     ret_code_t err_code;
 
@@ -71,7 +71,7 @@ static ret_code_t spi_transfer (uint8_t *tx_buff, size_t tx_len, uint8_t *rx_buf
 //    return err_code;
 //}
 
-static ret_code_t wait_write_complete (void)
+static ret_code_t wait_write_complete(void)
 {
     ret_code_t err_code;
     uint8_t cmd[3] = { READ_STATUS_CMD, 0, 0 };
@@ -86,7 +86,7 @@ static ret_code_t wait_write_complete (void)
     return err_code;
 }
 
-static ret_code_t write_enable (void)
+static ret_code_t write_enable(void)
 {
     ret_code_t err_code;
     uint8_t cmd = WRITE_ENABLE_CMD;
@@ -97,7 +97,7 @@ static ret_code_t write_enable (void)
     return err_code;
 }
 
-static ret_code_t ext_mem_soft_reset (void)
+static ret_code_t ext_mem_soft_reset(void)
 {
     ret_code_t err_code;
     uint8_t cmd = REST_ENABLE_CMD;
@@ -115,7 +115,7 @@ static ret_code_t ext_mem_soft_reset (void)
     return err_code;
 }
 
-ret_code_t enable_ext_mem_deep_power_down (void)
+ret_code_t enable_ext_mem_deep_power_down(void)
 {
     ret_code_t err_code;
     uint8_t cmd = DEEP_POWER_DOWN;
@@ -131,7 +131,7 @@ ret_code_t enable_ext_mem_deep_power_down (void)
     return err_code;
 }
 
-ret_code_t release_ext_mem_deep_power_down (void)
+ret_code_t release_ext_mem_deep_power_down(void)
 {
     /* Toggle the CS pin to release from the deep power down */
     nrf_delay_ms(10);
@@ -142,25 +142,34 @@ ret_code_t release_ext_mem_deep_power_down (void)
     return NRF_SUCCESS;
 }
 
-ret_code_t memory_erase (uint32_t address, uint32_t size)
+ret_code_t memory_erase(uint32_t address, uint32_t size)
 {
     ret_code_t err_code = NRF_SUCCESS;
     uint8_t cmd[4];
     uint8_t temp[4];
 
+    /** Check if address is aligned with 4K */
+
     while (size > 0)
     {
+        /** Check address alignment with page size */
+        if ((address % MEM_PAGE_SIZE) != 0 )
+        {
+            return NRF_ERROR_INVALID_DATA;
+        }
+
         cmd[1] = (address >> 16) & 0xFF;
         cmd[2] = (address >> 8) & 0xFF;
         cmd[3] = (address & 0xFF);
 
-        if (size >= MEM_SECTOR_SIZE)
-        {
-            cmd[0] = ERASE_64K_CMD;
-            size -= MEM_SECTOR_SIZE;
-            address += MEM_SECTOR_SIZE;
-        }
-        else if (size >= MEM_PAGE_SIZE)
+//        if (size >= MEM_SECTOR_SIZE)
+//        {
+//            cmd[0] = ERASE_64K_CMD;
+//            size -= MEM_SECTOR_SIZE;
+//            address += MEM_SECTOR_SIZE;
+//        }
+//        else
+        if (size >= MEM_PAGE_SIZE)
         {
             cmd[0] = ERASE_4K_CMD;
             size -= MEM_PAGE_SIZE;
@@ -189,7 +198,7 @@ ret_code_t memory_erase (uint32_t address, uint32_t size)
     return err_code;
 }
 
-ret_code_t memory_access (uint8_t access_type, uint32_t address, uint8_t *data, uint32_t len)
+ret_code_t memory_access(uint8_t access_type, uint32_t address, uint8_t *data, uint32_t len)
 {
     ret_code_t err_code = NRF_SUCCESS;
     /* Allocate extra 4 bytes for command and address */
@@ -203,7 +212,7 @@ ret_code_t memory_access (uint8_t access_type, uint32_t address, uint8_t *data, 
         return NRF_ERROR_INVALID_PARAM;
     }
 
-    if ((address + len) > MEM_END_ADDRESS)
+    if ((address + len) > MEMORY_SIZE)
     {
         /* Data size exceeds limit */
         return NRF_ERROR_DATA_SIZE;
@@ -280,17 +289,17 @@ ret_code_t memory_access (uint8_t access_type, uint32_t address, uint8_t *data, 
     return err_code;
 }
 
-ret_code_t memory_write (uint32_t address, uint8_t *data, uint32_t len)
+ret_code_t memory_write(uint32_t address, uint8_t *data, uint32_t len)
 {
     return memory_access(MEM_ACCESS_WRITE, address, data, len);
 }
 
-ret_code_t memory_read (uint32_t address, uint8_t *data, uint32_t len)
+ret_code_t memory_read(uint32_t address, uint8_t *data, uint32_t len)
 {
     return memory_access(MEM_ACCESS_READ, address, data, len);
 }
 
-void memory_erase_chip (void)
+void memory_erase_chip(void)
 {
     uint64_t mem_key = MEM_INIT_KEY;
 
@@ -299,17 +308,17 @@ void memory_erase_chip (void)
     memory_write(0x0, (uint8_t*) &mem_key, sizeof(mem_key));
 }
 
-uint32_t memory_erase_page (uint32_t start_address)
+uint32_t memory_erase_page(uint32_t start_address)
 {
     return memory_erase(start_address, MEM_PAGE_SIZE);
 }
 
-uint32_t memory_erase_sector (uint32_t start_address)
+uint32_t memory_erase_sector(uint32_t start_address)
 {
     return memory_erase(start_address, MEM_SECTOR_SIZE);
 }
 
-void ext_mem_init (void)
+void ext_mem_init(void)
 {
     uint64_t mem_key;
 
@@ -352,7 +361,7 @@ void ext_mem_init (void)
  working as expected */
 #define TEST_ADDRESS (0x1000)
 #define TEST_ARRAY_SIZE 4000
-void ext_mem_test (void)
+void ext_mem_test(void)
 {
     uint8_t write_data[TEST_ARRAY_SIZE];
     uint8_t read_data[TEST_ARRAY_SIZE];

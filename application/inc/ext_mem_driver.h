@@ -18,7 +18,7 @@ extern "C" {
 /* Memory size 1 Mbyte */
 #define MEMORY_SIZE         (0x100000)
 #define MEM_START_ADDRESS   (0x000000)
-#define MEM_END_ADDRESS     (MEMORY_SIZE - 1)
+
 
 #define MEM_PAGE_SIZE         (0x1000)
 #define MEM_SECTOR_SIZE      (0x10000)

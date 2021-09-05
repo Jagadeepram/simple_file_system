@@ -73,7 +73,12 @@ void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd);
 void cmd_sfs_read(uart_cmd_t *p_uart_cmd);
 /**@brief Function to write sfs */
 void cmd_sfs_write(uart_cmd_t *p_uart_cmd);
-
+/**@brief Function to write a file in parts */
+void cmd_sfs_write_in_parts(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read a file in parts */
+void cmd_sfs_read_in_parts(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read last written file info */
+void cmd_sfs_last_written(uart_cmd_t *p_uart_cmd);
 /**
  * @brief Command structure for command handling.
  */
@@ -83,22 +88,22 @@ typedef struct
     cmd_function_t cmd_function;
 } cmd_struct_t;
 
-cmd_struct_t cmd_struct[] =
-{
-        { COMMAND_UART_TEST, cmd_uart_test },
-        { COMMAND_EXT_MEM_READ, cmd_ext_mem_read },
-        { COMMAND_EXT_MEM_WRITE, cmd_ext_mem_write },
-        { COMMAND_EXT_MEM_PAGE_ERASE, cmd_ext_mem_page_erase },
-        { COMMAND_EXT_MEM_CHIP_ERASE, cmd_ext_mem_chip_erase },
-        { COMMAND_SFS_READ, cmd_sfs_read },
-        { COMMAND_SFS_WRITE, cmd_sfs_write }
-};
+cmd_struct_t cmd_struct[] = {   { COMMAND_UART_TEST, cmd_uart_test },
+                                { COMMAND_EXT_MEM_READ, cmd_ext_mem_read },
+                                { COMMAND_EXT_MEM_WRITE, cmd_ext_mem_write },
+                                { COMMAND_EXT_MEM_PAGE_ERASE, cmd_ext_mem_page_erase },
+                                { COMMAND_EXT_MEM_CHIP_ERASE, cmd_ext_mem_chip_erase },
+                                { COMMAND_SFS_READ, cmd_sfs_read },
+                                { COMMAND_SFS_WRITE, cmd_sfs_write },
+                                { COMMAND_SFS_WRITE_IN_PARTS, cmd_sfs_write_in_parts },
+                                { COMMAND_SFS_READ_IN_PARTS, cmd_sfs_read_in_parts },
+                                { COMMAND_SFS_LAST_WRITTEN, cmd_sfs_last_written}};
 
 /**@brief Function for handling UART errors.
  *
  * @param[in]   p_event   UART event.
  */
-void uart_error_handle(app_uart_evt_t * p_event)
+void uart_error_handle(app_uart_evt_t *p_event)
 {
     if (p_event->evt_type == APP_UART_COMMUNICATION_ERROR)
     {
@@ -173,7 +178,7 @@ static void uart_write_buffer(void *buf, int len)
     ASSERT(buf);
 #endif
 
-    uint8_t *ptr = (uint8_t *)buf;
+    uint8_t *ptr = (uint8_t*) buf;
     uint32_t i;
 
     for (i = 0; i < len; i++)
@@ -412,12 +417,12 @@ void cmd_uart_test(uart_cmd_t *p_uart_cmd)
 
 void cmd_ext_mem_write(uart_cmd_t *p_uart_cmd)
 {
-    p_uart_cmd->cmd_resp = memory_write( p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
+    p_uart_cmd->cmd_resp = memory_write(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
 }
 
 void cmd_ext_mem_read(uart_cmd_t *p_uart_cmd)
 {
-    p_uart_cmd->cmd_resp = memory_read(p_uart_cmd->arg[0],p_uart_cmd->payload, p_uart_cmd->arg[1]);
+    p_uart_cmd->cmd_resp = memory_read(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->arg[1]);
     p_uart_cmd->paylen = p_uart_cmd->arg[1];
 }
 
@@ -439,14 +444,62 @@ void cmd_sfs_read(uart_cmd_t *p_uart_cmd)
     /** Assign file name */
     file_info.file_header.file_id = p_uart_cmd->arg[0];
     p_uart_cmd->cmd_resp = sfs_read_file_info(&file_info);
+
+    p_uart_cmd->paylen = file_info.file_header.data_len;
+    /** Send the  file info */
+    p_uart_cmd->arg[1] = file_info.address;
+    p_uart_cmd->arg[2] = file_info.file_header.file_id;
+    p_uart_cmd->arg[3] = file_info.file_header.data_len;
+    p_uart_cmd->arg[4] = file_info.file_header.status;
+    p_uart_cmd->arg[5] = file_info.address + sizeof(sfs_file_header_t) + file_info.file_header.data_len;
+    p_uart_cmd->nbr_arg = 6;
+
     if (p_uart_cmd->cmd_resp == 0)
     {
         p_uart_cmd->cmd_resp = sfs_read_file_data(&file_info, p_uart_cmd->payload, file_info.file_header.data_len);
     }
-    p_uart_cmd->paylen = file_info.file_header.data_len;
 }
 
 void cmd_sfs_write(uart_cmd_t *p_uart_cmd)
 {
+    uint32_t address;
+    sfs_file_header_t header;
+
     p_uart_cmd->cmd_resp = sfs_write_file(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
+    if (sfs_last_written_info(p_uart_cmd->arg[0], &address, &header) == SFS_STATUS_SUCCESS)
+    {
+        /** Send the last written file info */
+        p_uart_cmd->arg[1] = address;
+        p_uart_cmd->arg[2] = header.file_id;
+        p_uart_cmd->arg[3] = header.data_len;
+        p_uart_cmd->arg[4] = header.status;
+        p_uart_cmd->arg[5] = address + sizeof(header) + header.data_len;
+        p_uart_cmd->nbr_arg = 6;
+    }
+}
+
+void cmd_sfs_write_in_parts(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->cmd_resp = sfs_write_file_in_parts(p_uart_cmd->arg[0], p_uart_cmd->arg[1], p_uart_cmd->payload, p_uart_cmd->paylen);
+}
+
+void cmd_sfs_read_in_parts(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->cmd_resp = sfs_read_file_in_parts(p_uart_cmd->arg[0], p_uart_cmd->arg[1], p_uart_cmd->payload, p_uart_cmd->arg[2]);
+    p_uart_cmd->paylen = p_uart_cmd->arg[2];
+}
+
+void cmd_sfs_last_written(uart_cmd_t *p_uart_cmd)
+{
+    uint32_t address;
+    sfs_file_header_t header;
+
+    p_uart_cmd->cmd_resp = sfs_last_written_info(p_uart_cmd->arg[0], &address, &header);
+    /** Send the last written file info */
+    p_uart_cmd->arg[1] = address;
+    p_uart_cmd->arg[2] = header.file_id;
+    p_uart_cmd->arg[3] = header.data_len;
+    p_uart_cmd->arg[4] = header.status;
+    p_uart_cmd->arg[5] = address + sizeof(header) + header.data_len;
+    p_uart_cmd->nbr_arg = 6;
 }

@@ -133,32 +133,55 @@ class Simple_FS(object):
         self.transport.read_response(msg_id=msg_id)
         print("Memory chip erased")
 
-    def file_test(self):
-        for i in range (15):
-            file_id = 0x20001
-            file_len = 2000
-            data = self.file_write(file_id, file_len + i)
-            time.sleep(1)
-#             print(data)
-            read_data = self.file_read(file_id)
-            time.sleep(1)
-            if (data == read_data):
-                print("match")
-            else:
-                print("mismatch")
+    def address_check(self):
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_EXT_MEM_READ
+        address = 0x2ffdc
+        len = 500
+        self.cmd_data.arg = [address, len]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        read_cmd = self.transport.read_response(msg_id=msg_id)
+        temp = read_cmd.payload
+        read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+        print(read_cmd.payload)
 
-    def file_read(self, file_id):
+    def file_test(self):
+        for i in range (300):
+            file_id = 0x10001
+            file_len = 2000
+            _, w_start_address, w_end_address = self.file_write(file_id, file_len + i)
+            #time.sleep(1)
+            #print(data)
+            _, r_start_address, r_end_address = self.file_read(file_id, file_len + i)
+            #print(read_data)
+            #time.sleep(1)
+            #if (data != read_data):
+            #self.address_check()
+            if (w_start_address != r_start_address or w_end_address != r_end_address):
+                print("0x%x"%w_start_address)
+                print("0x%x"%r_start_address)
+                print("0x%x"%w_end_address)
+                print("0x%x"%r_end_address)
+                print("mismatch")
+                #print(data)
+                #print(read_data)
+
+    def file_read(self, file_id,  file_len):
         self.cmd_data.clear()
         self.cmd_data.cmd = Command.COMMAND_SFS_READ
         self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
         read_cmd = self.transport.read_response(msg_id=msg_id)
         temp = read_cmd.payload
+
+        if (file_len != read_cmd.paylen):
+            print("File len mismatch")
+
         read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
         if (read_cmd.cmd != 0):
             print("File not found " + str(read_cmd.cmd))
 
-        return read_cmd.payload
+        return read_cmd.payload, read_cmd.arg[1], read_cmd.arg[5]
 
     def file_write(self, file_id, file_len):
         self.cmd_data.clear()
@@ -166,8 +189,97 @@ class Simple_FS(object):
         self.cmd_data.payload = [(random.randint(65, 90)) for __ in range (file_len)]
         self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
-        self.transport.read_response(msg_id=msg_id)
-        return self.cmd_data.payload
+        cmd_data = self.transport.read_response(msg_id=msg_id)
+        if (len(cmd_data.arg) == 6):
+            print("address 0x%x file ID %d file len %d status 0x%x next 0x%x"%(cmd_data.arg[1], cmd_data.arg[2], cmd_data.arg[3], cmd_data.arg[4], cmd_data.arg[5]))
+            if (cmd_data.arg[0] != file_id):
+                print("File write mismatch W file ID %d R file ID %d"%(file_id, cmd_data.arg[0]))
+        else:
+            print("Write error")
+        temp = cmd_data.payload
+        cmd_data.payload = [temp[j] for j in range (cmd_data.paylen)]
+        return cmd_data.payload, cmd_data.arg[1], cmd_data.arg[5]
+
+    def file_test_in_parts(self):
+        for i in range (300):
+            file_id = 0x10001
+            file_len = 10000
+            data, w_start, w_stop = self.file_write_in_parts(file_id, file_len + i)
+            read_data, r_start, r_stop = self.file_read_in_parts(file_id, file_len + i)
+            if (data != read_data 
+                or w_start != r_start 
+                or  w_stop!= r_stop):
+                print("mismatch")
+                print("0x%x"%w_start)
+                print("0x%x"%w_stop)
+                print("0x%x"%r_start)
+                print("0x%x"%r_stop)
+            else:
+                print("Test ok File ID %d File len %d start 0x%x stop 0x%x "%(file_id, file_len + i, w_start, w_stop))
+
+    def file_read_in_parts(self, file_id, file_len):
+        file = []
+        MAX_LEN_PER_TX = 1000
+        rem_len = file_len
+        while (rem_len > 0):
+            if (rem_len >= MAX_LEN_PER_TX):
+                data_len = MAX_LEN_PER_TX
+            else:
+                data_len = rem_len
+
+            self.cmd_data.clear()
+            self.cmd_data.cmd = Command.COMMAND_SFS_READ_IN_PARTS
+            self.cmd_data.arg = [file_id, rem_len, data_len]
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            read_cmd = self.transport.read_response(msg_id=msg_id)
+
+            temp = read_cmd.payload
+            read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+
+            file += read_cmd.payload
+            rem_len = rem_len - data_len
+            if (read_cmd.cmd != 0):
+                print("File not found " + str(read_cmd.cmd))
+                return file
+
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_SFS_LAST_WRITTEN
+        self.cmd_data.arg = [file_id]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        resp = self.transport.read_response(msg_id=msg_id)
+        return file, resp.arg[1], resp.arg[5]
+
+    def file_write_in_parts(self, file_id, file_len):
+
+        file = [(random.randint(65, 90)) for __ in range (file_len)]
+        #file = [0xbd for __ in range (file_len)]
+        MAX_LEN_PER_TX = 2000
+        rem_len = file_len
+        index = 0
+
+        while (rem_len > 0):
+            if (rem_len >= MAX_LEN_PER_TX):
+                data_len = MAX_LEN_PER_TX
+            else:
+                data_len = rem_len
+
+            self.cmd_data.clear()
+            self.cmd_data.cmd = Command.COMMAND_SFS_WRITE_IN_PARTS
+            self.cmd_data.arg = [file_id, rem_len]
+            self.cmd_data.payload = file[index: index + data_len]
+
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            self.transport.read_response(msg_id=msg_id)
+
+            index = index + data_len
+            rem_len = rem_len - data_len
+        
+        self.cmd_data.clear()
+        self.cmd_data.cmd = Command.COMMAND_SFS_LAST_WRITTEN
+        self.cmd_data.arg = [file_id]
+        msg_id = self.transport.write_cmd(self.cmd_data)
+        resp = self.transport.read_response(msg_id=msg_id)
+        return file, resp.arg[1], resp.arg[5]
 
     def GUI_app(self):
         window = Tk()
