@@ -22,6 +22,7 @@
 #include "uart_command.h"
 #include "ext_mem_driver.h"
 #include "simple_fs.h"
+#include "systick.h"
 
 /** When UART is used for communication with the host do not use flow control.*/
 #define UART_HWFC NRF_UART_HWFC_DISABLED
@@ -441,18 +442,24 @@ void cmd_ext_mem_chip_erase(uart_cmd_t *p_uart_cmd)
 void cmd_sfs_read(uart_cmd_t *p_uart_cmd)
 {
     sfs_file_info_t file_info;
+    uint32_t time_ms;
+    uint32_t index = 1;
+
+    /** Record the start time */
+    time_ms = get_systick_timer();
     /** Assign file name */
     file_info.file_header.file_id = p_uart_cmd->arg[0];
     p_uart_cmd->cmd_resp = sfs_read_file_info(&file_info);
 
     p_uart_cmd->paylen = file_info.file_header.data_len;
     /** Send the  file info */
-    p_uart_cmd->arg[1] = file_info.address;
-    p_uart_cmd->arg[2] = file_info.file_header.file_id;
-    p_uart_cmd->arg[3] = file_info.file_header.data_len;
-    p_uart_cmd->arg[4] = file_info.file_header.status;
-    p_uart_cmd->arg[5] = file_info.address + sizeof(sfs_file_header_t) + file_info.file_header.data_len;
-    p_uart_cmd->nbr_arg = 6;
+    p_uart_cmd->arg[index++] = file_info.address;
+    p_uart_cmd->arg[index++] = file_info.file_header.file_id;
+    p_uart_cmd->arg[index++] = file_info.file_header.data_len;
+    p_uart_cmd->arg[index++] = file_info.file_header.status;
+    p_uart_cmd->arg[index++] = file_info.address + sizeof(sfs_file_header_t) + file_info.file_header.data_len;
+    p_uart_cmd->arg[index++] = get_systick_timer() - time_ms;
+    p_uart_cmd->nbr_arg = index;
 
     if (p_uart_cmd->cmd_resp == 0)
     {
@@ -464,17 +471,22 @@ void cmd_sfs_write(uart_cmd_t *p_uart_cmd)
 {
     uint32_t address;
     sfs_file_header_t header;
+    uint32_t time_ms;
+    uint32_t index = 1;
 
+    /** Record the start time */
+    time_ms = get_systick_timer();
     p_uart_cmd->cmd_resp = sfs_write_file(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
     if (sfs_last_written_info(p_uart_cmd->arg[0], &address, &header) == SFS_STATUS_SUCCESS)
     {
         /** Send the last written file info */
-        p_uart_cmd->arg[1] = address;
-        p_uart_cmd->arg[2] = header.file_id;
-        p_uart_cmd->arg[3] = header.data_len;
-        p_uart_cmd->arg[4] = header.status;
-        p_uart_cmd->arg[5] = address + sizeof(header) + header.data_len;
-        p_uart_cmd->nbr_arg = 6;
+        p_uart_cmd->arg[index++] = address;
+        p_uart_cmd->arg[index++] = header.file_id;
+        p_uart_cmd->arg[index++] = header.data_len;
+        p_uart_cmd->arg[index++] = header.status;
+        p_uart_cmd->arg[index++] = address + sizeof(header) + header.data_len;
+        p_uart_cmd->arg[index++] = get_systick_timer() - time_ms;
+        p_uart_cmd->nbr_arg = index;
     }
 }
 

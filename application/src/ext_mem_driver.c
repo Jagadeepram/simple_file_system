@@ -149,11 +149,10 @@ ret_code_t memory_erase(uint32_t address, uint32_t size)
     uint8_t temp[4];
 
     /** Check if address is aligned with 4K */
-
     while (size > 0)
     {
-        /** Check address alignment with page size */
-        if ((address % MEM_PAGE_SIZE) != 0 )
+        /** Check address alignment and erase size with page size */
+        if ((address % MEM_PAGE_SIZE) != 0 || (size < MEM_PAGE_SIZE))
         {
             return NRF_ERROR_INVALID_DATA;
         }
@@ -162,14 +161,13 @@ ret_code_t memory_erase(uint32_t address, uint32_t size)
         cmd[2] = (address >> 8) & 0xFF;
         cmd[3] = (address & 0xFF);
 
-//        if (size >= MEM_SECTOR_SIZE)
-//        {
-//            cmd[0] = ERASE_64K_CMD;
-//            size -= MEM_SECTOR_SIZE;
-//            address += MEM_SECTOR_SIZE;
-//        }
-//        else
-        if (size >= MEM_PAGE_SIZE)
+        if ((size >= MEM_SECTOR_SIZE) && (address % MEM_SECTOR_SIZE == 0))
+        {
+            cmd[0] = ERASE_64K_CMD;
+            size -= MEM_SECTOR_SIZE;
+            address += MEM_SECTOR_SIZE;
+        }
+        else if ((size >= MEM_PAGE_SIZE) && (address % MEM_PAGE_SIZE == 0))
         {
             cmd[0] = ERASE_4K_CMD;
             size -= MEM_PAGE_SIZE;

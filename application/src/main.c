@@ -50,6 +50,7 @@
 #include "led.h"
 #include "storage_mngr.h"
 #include "ext_mem_driver.h"
+#include "systick.h"
 
 int main(void)
 {
@@ -57,7 +58,7 @@ int main(void)
     bsp_board_init(BSP_INIT_LEDS);
     APP_ERROR_CHECK(NRF_LOG_INIT(NULL));
     NRF_LOG_DEFAULT_BACKENDS_INIT();
-
+    APP_ERROR_CHECK(config_systick_timer());
     APP_ERROR_CHECK(app_timer_init());
 
     uart_init();

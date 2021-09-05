@@ -190,8 +190,8 @@ class Simple_FS(object):
         self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
         cmd_data = self.transport.read_response(msg_id=msg_id)
-        if (len(cmd_data.arg) == 6):
-            print("address 0x%x file ID %d file len %d status 0x%x next 0x%x"%(cmd_data.arg[1], cmd_data.arg[2], cmd_data.arg[3], cmd_data.arg[4], cmd_data.arg[5]))
+        if (len(cmd_data.arg) == 7):
+            print("address 0x%x file ID %d file len %d status 0x%x next 0x%x %dms"%(cmd_data.arg[1], cmd_data.arg[2], cmd_data.arg[3], cmd_data.arg[4], cmd_data.arg[5], cmd_data.arg[6]))
             if (cmd_data.arg[0] != file_id):
                 print("File write mismatch W file ID %d R file ID %d"%(file_id, cmd_data.arg[0]))
         else:
@@ -252,7 +252,6 @@ class Simple_FS(object):
     def file_write_in_parts(self, file_id, file_len):
 
         file = [(random.randint(65, 90)) for __ in range (file_len)]
-        #file = [0xbd for __ in range (file_len)]
         MAX_LEN_PER_TX = 2000
         rem_len = file_len
         index = 0
