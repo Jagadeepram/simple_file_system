@@ -110,31 +110,32 @@ static sfs_status_t sfs_move_active_files_to_gc_pages(uint32_t *address, uint32_
     /** Iterate through all folder pages */
     while ((*address < folder_end_address) && (*gc_address < gc_end_address) && (status == SFS_STATUS_BLANK))
     {
-        *address = PAGE_START_ADDR((*address), folder_start_address, page_size);
-        page_start_address = *address;
+         page_start_address = PAGE_START_ADDR((*address), folder_start_address, page_size);
+         if (*address == page_start_address)
+         {
+             /** Read the page status */
+             if (sfs_param->mem_read(*address, &page_state, sizeof(page_state)) != 0)
+             {
+                 return SFS_STATUS_DRIVER_ERROR;
+             }
 
-        /** Read the page status */
-        if (sfs_param->mem_read(*address, &page_state, sizeof(page_state)) != 0)
-        {
-            return SFS_STATUS_DRIVER_ERROR;
-        }
+             if (page_state == OBSOLETE_PAGE)
+             {
+                 if (sfs_param->mem_erase(*address, page_size))
+                 {
+                     return SFS_STATUS_DRIVER_ERROR;
+                 }
+                 *address += page_size;
+                 continue;
+             }
+             else if (page_state == NEW_PAGE)
+             {
+                 /** All active files are collected */
+                 status = SFS_STATUS_SUCCESS;
+             }
+             *address += sizeof(page_state);
+         }
 
-        if (page_state == OBSOLETE_PAGE)
-        {
-            if (sfs_param->mem_erase(*address, page_size))
-            {
-                return SFS_STATUS_DRIVER_ERROR;
-            }
-            *address += page_size;
-            continue;
-        }
-        else if (page_state == NEW_PAGE)
-        {
-            /** All active files are collected */
-            status = SFS_STATUS_SUCCESS;
-        }
-
-        *address += sizeof(page_state);
         /** Iterate through all files in a folder page */
         while ((*address < (page_start_address + page_size)) && (*gc_address < gc_end_address) && (status == SFS_STATUS_BLANK))
         {
@@ -284,7 +285,7 @@ static sfs_status_t sfs_find_nbr_of_free_pages(uint32_t start_address, uint32_t 
         {
             return SFS_STATUS_DRIVER_ERROR;
         }
-        if ((page_state == NEW_PAGE) || (page_state == ACTIVE_PAGE))
+        if (page_state == NEW_PAGE)
         {
             *nbr_pages += 1;
         }

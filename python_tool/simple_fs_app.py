@@ -27,8 +27,7 @@ def main():
     menu_options = {
         'a': ['data_transfer_test', "Uart Protocol tester"],
         'b': ['external_memory_erase', "External Memory Erase"],
-        'c': ['file_test', "File Test"],
-        'd': ['file_test_in_parts', "File Test in parts"],
+        'c': ['test_file_system', "Test file system"],
         'e': ['address_check', "address_check"],
         '1': ['exit', "Exit"]
     }

@@ -145,6 +145,11 @@ class Simple_FS(object):
         read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
         print(read_cmd.payload)
 
+    def test_file_system(self):
+        #self.file_test()
+        #self.file_test_in_parts()
+        self.test_long_folder()
+
     def file_test(self):
         for i in range (300):
             file_id = 0x10001
@@ -163,6 +168,7 @@ class Simple_FS(object):
                 print("0x%x"%w_end_address)
                 print("0x%x"%r_end_address)
                 print("mismatch")
+                return
                 #print(data)
                 #print(read_data)
 
@@ -180,7 +186,8 @@ class Simple_FS(object):
         read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
         if (read_cmd.cmd != 0):
             print("File not found " + str(read_cmd.cmd))
-
+            exit()
+        print("File ID %x Len %d" % (read_cmd.arg[2], read_cmd.arg[3]))
         return read_cmd.payload, read_cmd.arg[1], read_cmd.arg[5]
 
     def file_write(self, file_id, file_len):
@@ -190,15 +197,19 @@ class Simple_FS(object):
         self.cmd_data.arg = [file_id]
         msg_id = self.transport.write_cmd(self.cmd_data)
         cmd_data = self.transport.read_response(msg_id=msg_id)
-        if (len(cmd_data.arg) == 7):
-            print("address 0x%x file ID %d file len %d status 0x%x next 0x%x %dms"%(cmd_data.arg[1], cmd_data.arg[2], cmd_data.arg[3], cmd_data.arg[4], cmd_data.arg[5], cmd_data.arg[6]))
-            if (cmd_data.arg[0] != file_id):
-                print("File write mismatch W file ID %d R file ID %d"%(file_id, cmd_data.arg[0]))
+        if cmd_data.cmd == 0:
+            if (len(cmd_data.arg) == 7):
+                print("address 0x%x file ID %x file len %d status 0x%x next 0x%x %dms"%(cmd_data.arg[1], cmd_data.arg[2], cmd_data.arg[3], cmd_data.arg[4], cmd_data.arg[5], cmd_data.arg[6]))
+                if (cmd_data.arg[0] != file_id):
+                    print("File write mismatch W file ID %d R file ID %d"%(file_id, cmd_data.arg[0]))
+            else:
+                print("Write error")
+            temp = cmd_data.payload
+            cmd_data.payload = [temp[j] for j in range (cmd_data.paylen)]
+            return cmd_data.payload, cmd_data.arg[1], cmd_data.arg[5]
         else:
-            print("Write error")
-        temp = cmd_data.payload
-        cmd_data.payload = [temp[j] for j in range (cmd_data.paylen)]
-        return cmd_data.payload, cmd_data.arg[1], cmd_data.arg[5]
+            print("Error "+ str(cmd_data.cmd))
+            exit()
 
     def file_test_in_parts(self):
         for i in range (300):
@@ -214,8 +225,9 @@ class Simple_FS(object):
                 print("0x%x"%w_stop)
                 print("0x%x"%r_start)
                 print("0x%x"%r_stop)
+                exit()
             else:
-                print("Test ok File ID %d File len %d start 0x%x stop 0x%x "%(file_id, file_len + i, w_start, w_stop))
+                print("Test ok File ID %x File len %d start 0x%x stop 0x%x "%(file_id, file_len + i, w_start, w_stop))
 
     def file_read_in_parts(self, file_id, file_len):
         file = []
@@ -279,6 +291,37 @@ class Simple_FS(object):
         msg_id = self.transport.write_cmd(self.cmd_data)
         resp = self.transport.read_response(msg_id=msg_id)
         return file, resp.arg[1], resp.arg[5]
+
+    def test_long_folder(self):
+        for _ in range (10):
+            data = {}
+            for i in range (20):
+                file_id = 0x20001
+                file_len = 1000
+                w_data, w_start_address, w_end_address = self.file_write(file_id + i, file_len + i)
+                data[file_id + i] = w_data
+            for i in range (30):
+                file_id = 0x20100
+                file_len = 2000
+                w_data, w_start_address, w_end_address = self.file_write(file_id, file_len + i)
+                r_data, r_start_address, r_end_address = self.file_read(file_id, file_len + i)
+                if (w_start_address != r_start_address or w_end_address != r_end_address or w_data != r_data):
+                    print("0x%x"%w_start_address)
+                    print("0x%x"%r_start_address)
+                    print("0x%x"%w_end_address)
+                    print("0x%x"%r_end_address)
+                    print("mismatch")
+            for i in range (20):
+                file_id = 0x20001
+                file_len = 1000
+                r_data, w_start_address, w_end_address = self.file_read(file_id + i, file_len + i)
+                if (data[file_id + i] == r_data):
+                    print("Test OK %x"%(file_id + i))
+                else:
+                    print("Test not OK %x"%(file_id + i))
+                    print(r_data)
+                    print(data[file_id + i])
+                    exit()
 
     def GUI_app(self):
         window = Tk()

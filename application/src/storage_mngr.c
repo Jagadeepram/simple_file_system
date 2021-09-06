@@ -31,6 +31,7 @@ sfs_status_t init_storage (void)
     /** Address for the garbage collection */
     sfs_parameters.gc_address = MEM_START_ADDRESS;
     /** Length of the garbage collection */
+    /** This should be at least equal to highest folder page length */
     sfs_parameters.gc_len = MEM_SECTOR_SIZE;
     /** Number of folders within the total allocation (sfs_properties.mem_len) */
     sfs_parameters.nbr_folders = 3;
@@ -40,7 +41,7 @@ sfs_status_t init_storage (void)
     sfs_folder_info[CONFIG_FOLDER].start_address = MEM_START_ADDRESS + MEM_SECTOR_SIZE + MEM_PAGE_SIZE * 5;
 
     sfs_folder_info[LOG_FOLDER].page_len = MEM_PAGE_SIZE;
-    sfs_folder_info[LOG_FOLDER].folder_len = sfs_folder_info[LOG_FOLDER].page_len * 2;
+    sfs_folder_info[LOG_FOLDER].folder_len = sfs_folder_info[LOG_FOLDER].page_len * 10;
     sfs_folder_info[LOG_FOLDER].start_address = (sfs_folder_info[CONFIG_FOLDER].start_address + sfs_folder_info[CONFIG_FOLDER].folder_len);
 
     sfs_folder_info[DATA_FOLDER].page_len = MEM_SECTOR_SIZE;
