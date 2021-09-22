@@ -23,6 +23,7 @@
 #include "ext_mem_driver.h"
 #include "simple_fs.h"
 #include "systick.h"
+#include "large_file_storage.h"
 
 /** When UART is used for communication with the host do not use flow control.*/
 #define UART_HWFC NRF_UART_HWFC_DISABLED
@@ -80,6 +81,10 @@ void cmd_sfs_write_in_parts(uart_cmd_t *p_uart_cmd);
 void cmd_sfs_read_in_parts(uart_cmd_t *p_uart_cmd);
 /**@brief Function to read last written file info */
 void cmd_sfs_last_written(uart_cmd_t *p_uart_cmd);
+/**@brief Function to write measurement file */
+void cmd_meas_write(uart_cmd_t *p_uart_cmd);
+/**@brief Function to read measurement file */
+void cmd_meas_read(uart_cmd_t *p_uart_cmd);
 /**
  * @brief Command structure for command handling.
  */
@@ -98,7 +103,9 @@ cmd_struct_t cmd_struct[] = {   { COMMAND_UART_TEST, cmd_uart_test },
                                 { COMMAND_SFS_WRITE, cmd_sfs_write },
                                 { COMMAND_SFS_WRITE_IN_PARTS, cmd_sfs_write_in_parts },
                                 { COMMAND_SFS_READ_IN_PARTS, cmd_sfs_read_in_parts },
-                                { COMMAND_SFS_LAST_WRITTEN, cmd_sfs_last_written}};
+                                { COMMAND_SFS_LAST_WRITTEN, cmd_sfs_last_written},
+                                { COMMAND_MEAS_WRITE, cmd_meas_write},
+                                { COMMAND_MEAS_READ, cmd_meas_read}};
 
 /**@brief Function for handling UART errors.
  *
@@ -514,4 +521,16 @@ void cmd_sfs_last_written(uart_cmd_t *p_uart_cmd)
     p_uart_cmd->arg[4] = header.status;
     p_uart_cmd->arg[5] = address + sizeof(header) + header.data_len;
     p_uart_cmd->nbr_arg = 6;
+}
+
+void cmd_meas_write(uart_cmd_t *p_uart_cmd)
+{
+    p_uart_cmd->cmd_resp = write_measurement_in_parts(p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->paylen);
+}
+
+void cmd_meas_read(uart_cmd_t *p_uart_cmd)
+{
+    uint32_t address = first_written_file_address();
+    p_uart_cmd->cmd_resp = read_measurement_in_parts(address, p_uart_cmd->arg[0], p_uart_cmd->payload, p_uart_cmd->arg[1]);
+    p_uart_cmd->paylen = p_uart_cmd->arg[1];
 }

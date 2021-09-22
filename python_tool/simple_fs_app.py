@@ -28,6 +28,7 @@ def main():
         'a': ['data_transfer_test', "Uart Protocol tester"],
         'b': ['external_memory_erase', "External Memory Erase"],
         'c': ['test_file_system', "Test file system"],
+        'd': ['test_meas_file', "Test measurement file system"],
         'e': ['address_check', "address_check"],
         '1': ['exit', "Exit"]
     }

@@ -87,14 +87,18 @@ typedef struct
 #define COMMAND_EXT_MEM_CHIP_ERASE      0x0013
 
 /** Simple File system commands */
-#define COMMAND_SFS_READ             0x0100
-#define COMMAND_SFS_WRITE            0x0101
+#define COMMAND_SFS_READ                0x0100
+#define COMMAND_SFS_WRITE               0x0101
 /** Command to write file in parts */
-#define COMMAND_SFS_READ_IN_PARTS    0x0102
+#define COMMAND_SFS_READ_IN_PARTS       0x0102
 /** Command to read file in parts */
-#define COMMAND_SFS_WRITE_IN_PARTS   0x0103
+#define COMMAND_SFS_WRITE_IN_PARTS      0x0103
 /** Command to read last written file */
-#define COMMAND_SFS_LAST_WRITTEN   0x0104
+#define COMMAND_SFS_LAST_WRITTEN        0x0104
+
+/** Measurement File Command  */
+#define COMMAND_MEAS_WRITE              0x0201
+#define COMMAND_MEAS_READ               0x0202
 
 /**@brief Function for writing the atomic FIFO to UART. */
 void atfifo_to_uart(void);

@@ -8,6 +8,7 @@ C_SRC := \
     $(APP_DIR)/src/storage_mngr.c \
     $(APP_DIR)/src/simple_fs.c \
     $(APP_DIR)/src/systick.c \
+    $(APP_DIR)/src/large_file_storage.c \
 
 VPATH := $(APP_DIR)/src/
 

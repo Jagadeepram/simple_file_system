@@ -323,6 +323,70 @@ class Simple_FS(object):
                     print(data[file_id + i])
                     exit()
 
+
+    def meas_read_in_parts(self, file_len):
+        file = []
+        MAX_LEN_PER_TX = 1000
+        rem_len = file_len
+        while (rem_len > 0):
+            if (rem_len >= MAX_LEN_PER_TX):
+                data_len = MAX_LEN_PER_TX
+            else:
+                data_len = rem_len
+
+            self.cmd_data.clear()
+            self.cmd_data.cmd = Command.COMMAND_MEAS_READ
+            self.cmd_data.arg = [rem_len, data_len]
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            read_cmd = self.transport.read_response(msg_id=msg_id)
+
+            temp = read_cmd.payload
+            read_cmd.payload = [temp[j] for j in range (read_cmd.paylen)]
+
+            file += read_cmd.payload
+            rem_len = rem_len - data_len
+            if (read_cmd.cmd != 0):
+                print("File not found " + str(read_cmd.cmd))
+                return file
+        
+        return file
+
+    def meas_write_in_parts(self, file_len):
+
+        file = [(random.randint(65, 90)) for __ in range (file_len)]
+        MAX_LEN_PER_TX = 2000
+        rem_len = file_len
+        index = 0
+
+        while (rem_len > 0):
+            if (rem_len >= MAX_LEN_PER_TX):
+                data_len = MAX_LEN_PER_TX
+            else:
+                data_len = rem_len
+
+            self.cmd_data.clear()
+            self.cmd_data.cmd = Command.COMMAND_MEAS_WRITE
+            self.cmd_data.arg = [rem_len]
+            self.cmd_data.payload = file[index: index + data_len]
+
+            msg_id = self.transport.write_cmd(self.cmd_data)
+            self.transport.read_response(msg_id=msg_id)
+
+            index = index + data_len
+            rem_len = rem_len - data_len
+
+        return file
+
+    def test_meas_file(self):
+        file_len = 10000
+        w_file = self.meas_write_in_parts(file_len)
+        r_file = self.meas_read_in_parts(file_len)
+
+        if (w_file == r_file):
+            print("Match")
+        else:
+            print("Mismatch")
+
     def GUI_app(self):
         window = Tk()
         window.title("Welcome to LikeGeeks app")

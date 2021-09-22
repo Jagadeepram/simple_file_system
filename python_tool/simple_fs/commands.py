@@ -34,3 +34,7 @@ class Command(CommandBase):
     """ Last written file info """
     COMMAND_SFS_LAST_WRITTEN = 0x0104
 
+    """ Measurement File Command  """
+    COMMAND_MEAS_WRITE = 0x0201
+    COMMAND_MEAS_READ  = 0x0202
+
