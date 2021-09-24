@@ -378,14 +378,23 @@ class Simple_FS(object):
         return file
 
     def test_meas_file(self):
-        file_len = 10000
-        w_file = self.meas_write_in_parts(file_len)
-        r_file = self.meas_read_in_parts(file_len)
+        file_len = 73700
+        write_buffer = []
 
-        if (w_file == r_file):
-            print("Match")
-        else:
-            print("Mismatch")
+        nbr_write_files = 13
+        nbr_read_files = 6
+        for _ in range (nbr_write_files):
+            w_file = self.meas_write_in_parts(file_len)
+            write_buffer.append(w_file)
+
+        for i in range (nbr_read_files):
+            #print(write_buffer[nbr_write_files-nbr_read_files+i])
+            r_file = self.meas_read_in_parts(file_len)
+            #print(r_file)
+            if (write_buffer[nbr_write_files-nbr_read_files+i] == r_file):
+                print("Match")
+            else:
+                print("Mismatch")
 
     def GUI_app(self):
         window = Tk()

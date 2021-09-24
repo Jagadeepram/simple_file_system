@@ -24,7 +24,7 @@ meas_store_status_t write_measurement_in_parts(uint32_t rem_len, uint8_t *data, 
     while ((address + FILE_ALLOC_SIZE) < END_ADDRESS)
     {
         /** Check if there is a partial or new file */
-        if (memory_read(address, (uint8_t *) &file_header.status, sizeof(file_header.status)) != 0)
+        if (memory_read(address, (uint8_t *) &file_header, sizeof(file_header)) != 0)
         {
             return MEAS_STORE_STATUS_IO_ERROR;
         }
@@ -55,10 +55,13 @@ meas_store_status_t write_measurement_in_parts(uint32_t rem_len, uint8_t *data, 
         file_header.file_id = (address - START_ADDRESS)/FILE_ALLOC_SIZE;
         current_file_address = address;
         file_header.file_len = rem_len;
+
         if (memory_write(address, (uint8_t *) &file_header, sizeof(file_header)) != 0)
         {
             return MEAS_STORE_STATUS_IO_ERROR;
         }
+
+ NRF_LOG_INFO("New File %d len %d address 0x%x", file_header.file_id, rem_len, address);
     }
 
     if (rem_len == data_len)
@@ -75,6 +78,9 @@ meas_store_status_t write_measurement_in_parts(uint32_t rem_len, uint8_t *data, 
         {
             return MEAS_STORE_STATUS_IO_ERROR;
         }
+
+NRF_LOG_INFO("End Of File %d len %d address 0x%x", file_header.file_id, file_header.file_len, address);
+NRF_LOG_INFO("Erase address 0x%x", erase_address);
     }
 
     address += ((file_header.file_len - rem_len) + sizeof(file_header));
@@ -90,7 +96,7 @@ meas_store_status_t read_measurement_in_parts(uint32_t file_address, uint32_t re
     meas_store_status_t status = MEAS_STORE_STATUS_SUCCESS;
     file_header_t file_header;
 
-    if (memory_read(file_address, (uint8_t *) &file_header.status, sizeof(file_header.status)) != 0)
+    if (memory_read(file_address, (uint8_t *) &file_header, sizeof(file_header)) != 0)
     {
         return MEAS_STORE_STATUS_IO_ERROR;
     }
@@ -108,6 +114,7 @@ meas_store_status_t read_measurement_in_parts(uint32_t file_address, uint32_t re
         {
             return MEAS_STORE_STATUS_IO_ERROR;
         }
+NRF_LOG_INFO("Mark Read File %d len %d address 0x%x", file_header.file_id, file_header.file_len, file_address);
     }
 
     file_address += ((file_header.file_len - rem_len) + sizeof(file_header));
@@ -150,6 +157,6 @@ uint32_t first_written_file_address(void)
         /** No written files found, set the address to zero */
         address = 0;
     }
-
+NRF_LOG_INFO("Read File at address 0x%x", address);
     return address;
 }

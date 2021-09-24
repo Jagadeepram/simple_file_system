@@ -71,5 +71,6 @@ int main(void)
     while (1)
     {
         uart_data_handle();
+        NRF_LOG_FLUSH();
     }
 }

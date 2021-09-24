@@ -3,7 +3,7 @@
 #define LARGE_FILE_STORAGE_H_
 
 
-/** Start address of the storage */
+/** Start address of the storage. Do not start at 0x0 location */
 #define START_ADDRESS           0x80000
 /** End address of the storage */
 #define END_ADDRESS             0x100000
