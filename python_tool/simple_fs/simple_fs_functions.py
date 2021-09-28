@@ -378,10 +378,11 @@ class Simple_FS(object):
         return file
 
     def test_meas_file(self):
-        file_len = 73700
+        #file_len = 73700
+        file_len = 4000
         write_buffer = []
 
-        nbr_write_files = 13
+        nbr_write_files = 20
         nbr_read_files = 6
         for _ in range (nbr_write_files):
             w_file = self.meas_write_in_parts(file_len)

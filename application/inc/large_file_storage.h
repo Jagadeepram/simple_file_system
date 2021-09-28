@@ -2,13 +2,16 @@
 #ifndef LARGE_FILE_STORAGE_H_
 #define LARGE_FILE_STORAGE_H_
 
+/** Start address of the meta data. Do not start at 0x0 location */
+#define META_DATA_START_ADDRESS         0x7F000
 
+#define META_DATA_END_ADDRESS           0x80000
 /** Start address of the storage. Do not start at 0x0 location */
-#define START_ADDRESS           0x80000
+#define DATA_START_ADDRESS                   0x80000
 /** End address of the storage */
-#define END_ADDRESS             0x100000
+#define DATA_END_ADDRESS                     0x100000
 /** Allocated size for one file in multiples of 4K */
-#define FILE_ALLOC_SIZE         (73728) // 4096 * 18
+#define FILE_ALLOC_SIZE                 (73728) // 4096 * 18
 
 /** A space to store a new file */
 #define SPACE_FOR_NEW_FILE      (0xFF)
